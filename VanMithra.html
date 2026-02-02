@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VanMithra</title>
+    <!-- Use Tailwind CSS for a clean, responsive design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Add Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Leaflet.js for the interactive map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+            position: relative;
+        }
+
+        /* The background image is a local path and will not work without a public URL.
+           I have replaced it with a public URL for demonstration purposes. */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('Forest.webp');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            opacity: 0.1;
+            z-index: -1;
+        }
+
+        /* Custom styles for dark mode compatibility with Tailwind */
+        .bg-white {
+            background-color: #2d3748;
+        }
+
+        .text-gray-800 {
+            color: #e2e8f0;
+        }
+
+        .text-gray-600 {
+            color: #cbd5e0;
+        }
+
+        .text-gray-500 {
+            color: #a0aec0;
+        }
+
+        /* Styles for the map section */
+        #container {
+            display: flex;
+            flex-grow: 1;
+            height: 600px;
+        }
+
+        #controls {
+            width: 280px;
+            background: #2d3748;
+            padding: 20px;
+            box-shadow: 4px 0px 10px rgba(0, 0, 0, 0.2);
+            border-right: 1px solid #4a5568;
+            display: flex;
+            flex-direction: column;
+            z-index: 999;
+        }
+
+        #controls h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #e2e8f0;
+            border-bottom: 2px solid #60A5FA;
+            padding-bottom: 10px;
+            font-weight: 600;
+        }
+
+        #controls label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #cbd5e0;
+            font-size: 0.9em;
+        }
+
+        #forestSelect {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #4a5568;
+            margin-bottom: 20px;
+            font-size: 1em;
+            font-family: 'Poppins', sans-serif;
+            background-color: #4a5568;
+            color: #e2e8f0;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        #forestSelect:focus {
+            border-color: #60A5FA;
+            box-shadow: 0 0 5px rgba(96, 165, 250, 0.5);
+            outline: none;
+        }
+
+        #goBtn {
+            background: #10B981;
+            color: white;
+            border: none;
+            padding: 12px;
+            width: 100%;
+            font-size: 1.1em;
+            font-weight: 600;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+        }
+
+        #goBtn:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        #controls .tip {
+            margin-top: 25px;
+            font-size: 0.85em;
+            color: #a0aec0;
+            line-height: 1.5;
+            background-color: #4a5568;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 3px solid #718096;
+        }
+
+        #map {
+            flex-grow: 1;
+            height: 100%;
+        }
+
+        /* Leaflet popup styling */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            background: #2d3748;
+            color: #e2e8f0;
+        }
+
+        .leaflet-popup-content {
+            margin: 15px;
+            min-width: 150px;
+        }
+
+        .popup-title {
+            font-weight: 600;
+            font-size: 1.2em;
+            color: #e2e8f0;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #4a5568;
+        }
+
+        .claim-approved {
+            color: #60A5FA;
+            font-weight: bold;
+            background-color: rgba(96, 165, 250, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .claim-pending {
+            color: #FBBF24;
+            font-weight: bold;
+            background-color: rgba(251, 191, 36, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .popup-btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .details-btn,
+        .info-btn {
+            background-color: #60A5FA;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .details-btn:hover,
+        .info-btn:hover {
+            background-color: #3B82F6;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: #2d3748;
+            padding: 25px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #4a5568;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .modal-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #FBBF24;
+        }
+
+        .close-btn {
+            font-size: 1.8em;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: #cbd5e0;
+        }
+
+        .close-btn:hover {
+            color: #e2e8f0;
+        }
+
+        .modal-body {
+            line-height: 1.6;
+            text-align: left;
+        }
+
+        /* General app styling */
+        .tab-button.active {
+            border-bottom-width: 2px;
+            border-color: currentColor;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .forest-filter-btn.active {
+            background-color: #059669;
+            color: white;
+        }
+
+        /* Force Chart.js to inherit styles */
+        canvas {
+            background-color: transparent !important;
+        }
+
+        #loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="p-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Main header for the whole app -->
+        <div class="flex items-center justify-between mb-8">
+            <h1 class="text-4xl font-extrabold" style="color: #e2e8f0;" data-i18n="app-title">VanMithra</h1>
+            <div class="flex items-center space-x-4">
+                <select id="languageSelect" class="p-2 rounded-md bg-gray-200 text-gray-800">
+                    <option value="en" selected>English</option>
+                    <option value="hi">हिन्दी</option>
+                    <option value="te">తెలుగు</option>
+                    <option value="ta">தமிழ்</option>
+                    <option value="ka">ಕನ್ನಡ</option>
+                    <option value="bn">বাংলা</option>
+                    <option value="ur">اردو</option>
+                    <option value="ml">മലയാളം</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="flex border-b border-gray-200 mb-8">
+            <!-- DSS tab is now first -->
+            <button id="tab-dss"
+                class="tab-button flex-1 py-4 px-6 text-center text-gray-600 font-semibold hover:text-green-600 hover:border-green-600"
+                data-i18n="tab-dss">Decision Support</button>
+            <button id="tab-map"
+                class="tab-button flex-1 py-4 px-6 text-center text-gray-600 font-semibold hover:text-green-600 hover:border-green-600"
+                data-i18n="tab-map">FRA Atlas</button>
+            <!-- Records tab is now third -->
+            <button id="tab-records"
+                class="tab-button flex-1 py-4 px-6 text-center text-gray-600 font-semibold hover:text-green-600 hover:border-green-600"
+                data-i18n="tab-records">Records Digitization</button>
+            <button id="tab-community"
+                class="tab-button flex-1 py-4 px-6 text-center text-gray-600 font-semibold hover:text-green-600 hover:border-green-600"
+                data-i18n="tab-community">Community & Feedback</button>
+        </div>
+
+        <!-- DSS Dashboard Tab Content is now first -->
+        <div id="content-dss" class="tab-content hidden p-4">
+            <!-- Filter Buttons & Summary Metrics -->
+            <section class="mb-4">
+                <div class="flex flex-col md:flex-row md:justify-between md:items-center relative">
+                    <div class="flex flex-wrap space-x-2 mt-2 md:mt-0">
+                        <button
+                            class="forest-filter-btn px-4 py-2 bg-green-700 text-white rounded hover:bg-green-600 transition-colors duration-200"
+                            data-filter="all">Show All</button>
+                        <button
+                            class="forest-filter-btn px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-green-600 hover:text-white transition-colors duration-200"
+                            data-filter="Bandipur National forest">Bandipur National forest</button>
+                        <button
+                            class="forest-filter-btn px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-green-600 hover:text-white transition-colors duration-200"
+                            data-filter="Gir forest">Gir forest</button>
+                        <button
+                            class="forest-filter-btn px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-green-600 hover:text-white transition-colors duration-200"
+                            data-filter="Jim Corbett National park">Jim Corbett National park</button>
+                        <button
+                            class="forest-filter-btn px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-green-600 hover:text-white transition-colors duration-200"
+                            data-filter="Kanha National park">Kanha National park</button>
+                        <button
+                            class="forest-filter-btn px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-green-600 hover:text-white transition-colors duration-200"
+                            data-filter="Periyar National Park">Periyar National Park</button>
+                        <button
+                            class="forest-filter-btn px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-green-600 hover:text-white transition-colors duration-200"
+                            data-filter="Sariska National park">Sariska National park</button>
+                        <button
+                            class="forest-filter-btn px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-green-600 hover:text-white transition-colors duration-200"
+                            data-filter="Satpura forest">Satpura forest</button>
+                        <button
+                            class="forest-filter-btn px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-green-600 hover:text-white transition-colors duration-200"
+                            data-filter="Sundarbans">Sundarbans</button>
+                        <button
+                            class="forest-filter-btn px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-green-600 hover:text-white transition-colors duration-200"
+                            data-filter="Tadoba Andhari Tiger Reserve">Tadoba Andhari Tiger Reserve</button>
+                    </div>
+                </div>
+
+                <div id="metricsSection" class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-8">
+                    <!-- Forest cards will be dynamically inserted here -->
+                </div>
+            </section>
+
+            <!-- Analytical Charts -->
+            <section class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-white p-4 rounded-xl shadow">
+                    <h2 class="font-bold mb-2 text-gray-800">Deforestation Trends</h2>
+                    <canvas id="deforestationChart"></canvas>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow">
+                    <h2 class="font-bold mb-2 text-gray-800">Afforestation Trends</h2>
+                    <canvas id="afforestationChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Policy Simulation Panel -->
+            <section class="p-4 bg-white rounded-xl shadow">
+                <h2 class="text-xl font-bold mb-2 text-gray-800">Policy Simulation</h2>
+
+                <div class="mb-4">
+                    <label for="afforestationInput" class="block mb-2 text-gray-800">Increase Afforestation Funding
+                        (%)</label>
+                    <input id="afforestationInput" type="range" min="0" max="50" value="10" class="w-full">
+                </div>
+
+                <div class="mb-4">
+                    <label for="patrolInput" class="block mb-2 text-gray-800">Increase Anti-Poaching Patrols (%)</label>
+                    <input id="patrolInput" type="range" min="0" max="50" value="10" class="w-full">
+                </div>
+
+                <p class="mb-4 text-gray-800">Predicted Change in Forest Cover: <span id="predictionValue"
+                        class="text-green-600 font-bold">+2%</span></p>
+            </section>
+
+            <!-- Key Metrics Section -->
+            <section class="p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-white p-4 rounded-xl shadow text-center">
+                    <h3 class="font-bold text-gray-800">Tree Density (per ha)</h3>
+                    <p id="treeDensity" class="text-2xl text-green-600">--</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow text-center">
+                    <h3 class="font-bold text-gray-800">Biodiversity Index</h3>
+                    <p id="biodiversityIndex" class="text-2xl text-blue-600">--</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow text-center">
+                    <h3 class="font-bold text-gray-800">Water Level (m)</h3>
+                    <p id="waterLevel" class="text-2xl text-blue-400">--</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow text-center">
+                    <h3 class="font-bold text-gray-800">Ecosystem Value ($B)</h3>
+                    <p id="ecosystemValue" class="text-2xl text-green-700">--</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow text-center">
+                    <h3 class="font-bold text-gray-800">Threat Level</h3>
+                    <p id="threatLevel" class="text-2xl">--</p>
+                </div>
+            </section>
+
+            <!-- Reports Section -->
+            <section class="p-4">
+                <button
+                    class="bg-green-700 text-white px-4 py-2 rounded-full shadow hover:bg-green-600 transition-colors duration-200">Download
+                    PDF Report</button>
+            </section>
+        </div>
+
+        <!-- Interactive Map Tab Content -->
+        <div id="content-map" class="tab-content hidden">
+            <div id="container" class="bg-white rounded-xl shadow-lg">
+                <div id="controls">
+                    <h3 data-i18n="controls-header">Controls</h3>
+                    <label for="forestSelect" data-i18n="select-forest">Select Forest:</label>
+                    <select id="forestSelect">
+                        <option value="satpura" data-i18n="forest-satpura">Satpura Forest</option>
+                        <option value="gir" data-i18n="forest-gir">Gir Forest</option>
+                        <option value="sundarbans" data-i18n="forest-sundarbans">Sundarbans</option>
+                        <option value="kanha" data-i18n="forest-kanha">Kanha National Park</option>
+                        <option value="corbett" data-i18n="forest-corbett">Jim Corbett National Park</option>
+                        <option value="bandipur" data-i18n="forest-bandipur">Bandipur National Park</option>
+                        <option value="sariska" data-i18n="forest-sariska">Sariska National Park</option>
+                        <option value="periyar" data-i18n="forest-periyar">Periyar National Park</option>
+                        <option value="kaziranga" data-i18n="forest-kaziranga">Kaziranga National Park</option>
+                        <option value="tadoba" data-i18n="forest-tadoba">Tadoba Andhari Tiger Reserve</option>
+                    </select>
+                    <button id="goBtn" data-i18n="go-button">Go</button>
+                    <p class="tip">
+                        <b data-i18n="tip-label">Tip:</b>
+                        <span data-i18n="tip-content">Use the top-right button on the map to switch modes (Satellite,
+                            Light, Dark, etc.).</span>
+                    </p>
+                </div>
+                <div id="map"></div>
+            </div>
+        </div>
+
+        <!-- Records Digitization Tab Content is now third -->
+        <div id="content-records" class="tab-content hidden">
+            <header class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h2 class="text-2xl font-bold text-gray-800" data-i18n="dashboard-title-records">FRA Records
+                    Digitization</h2>
+                <p class="mt-2 text-gray-600" data-i18n="subtitle-records">Upload scanned FRA claim forms to
+                    automatically extract information.</p>
+            </header>
+            <section class="bg-white rounded-xl shadow-lg p-6">
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2" for="file-upload"
+                            data-i18n="upload-label">Upload FRA Claim Form (PDF/Image)</label>
+                        <input type="file" id="file-upload" accept=".pdf,image/*" class="w-full text-sm text-gray-500
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-full file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-green-50 file:text-green-700
+                            hover:file:bg-green-100" />
+                    </div>
+                    <button id="process-button"
+                        class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-full transition-all hover:bg-green-700 flex items-center justify-center">
+                        <span id="process-button-text" data-i18n="process-button">Process & Extract Data</span>
+                        <div id="loading-spinner" class="hidden ml-2"></div>
+                    </button>
+                    <div id="extracted-data-container" class="mt-6 border-t-2 border-gray-200 pt-6 hidden">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4" data-i18n="extracted-title">Extracted
+                            Information</h3>
+                        <div class="space-y-4">
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <p class="text-gray-600"><strong data-i18n="field-village">Village:</strong> <span
+                                        id="village-field">N/A</span></p>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <p class="text-gray-600"><strong data-i18n="field-holder">Patta Holder:</strong> <span
+                                        id="holder-field">N/A</span></p>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <p class="text-gray-600"><strong data-i18n="field-coords">Coordinates:</strong> <span
+                                        id="coords-field">N/A</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Community & Feedback Tab Content -->
+        <div id="content-community" class="tab-content hidden">
+            <header class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h2 class="text-2xl font-bold text-gray-800" data-i18n="dashboard-title-community">Community & Feedback
+                </h2>
+                <p class="mt-2 text-gray-600" data-i18n="subtitle-community">Patta holders can verify boundaries and
+                    submit updates.</p>
+            </header>
+            <section class="bg-white rounded-xl shadow-lg p-6">
+                <div class="space-y-6">
+                    <form id="community-form">
+                        <div>
+                            <label class="block text-gray-700 font-semibold mb-2" for="patta-holder-id"
+                                data-i18n="community-patta-id">Patta Holder ID</label>
+                            <input type="text" id="patta-holder-id"
+                                class="w-full p-2 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-600" />
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 font-semibold mb-2" for="boundary-verification"
+                                data-i18n="community-boundary-verification">Boundary Verification (GPS Data)</label>
+                            <textarea id="boundary-verification" rows="4"
+                                class="w-full p-2 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-600"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 font-semibold mb-2" for="feedback-update"
+                                data-i18n="community-feedback-update">Feedback & Updates (e.g., crop info, water
+                                availability)</label>
+                            <textarea id="feedback-update" rows="4"
+                                class="w-full p-2 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-600"></textarea>
+                        </div>
+                        <button type="submit" id="community-submit-button"
+                            class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-full transition-all hover:bg-green-700"
+                            data-i18n="community-submit-button">
+                            Submit Feedback
+                        </button>
+                    </form>
+                    <div id="community-success-message"
+                        class="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 p-4 rounded-lg hidden"
+                        role="alert">
+                        <strong data-i18n="community-success-title">Success!</strong> <span
+                            data-i18n="community-success-body">Your feedback has been submitted. Thank you.</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Modal for details -->
+    <div id="pendingModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" data-i18n="modal-title-general">Conservation & Wildlife Info</h3>
+                <button id="closeModalBtn" class="close-btn" data-i18n="close-button">&times;</button>
+            </div>
+            <div id="modalBody" class="modal-body"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Global State & Data
+        //--------------------------------------------------------------------------------
+        // Firebase imports (to be used when you connect to a backend)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase boilerplate
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Initialize Firebase
+        let app, db, auth;
+        if (Object.keys(firebaseConfig).length > 0) {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            // Sign in with custom token or anonymously
+            if (initialAuthToken) {
+                signInWithCustomToken(auth, initialAuthToken).catch(console.error);
+            } else {
+                signInAnonymously(auth).catch(console.error);
+            }
+        } else {
+            console.log("Firebase not configured. Running in mock data mode.");
+        }
+
+        const translations = {
+            en: {
+                'app-title': 'VanMithra',
+                'tab-records': 'Records Digitization',
+                'tab-map': 'FRA Atlas',
+                'tab-dss': 'Decision Support',
+                'tab-community': 'Community & Feedback',
+                'dashboard-title-records': 'FRA Records Digitization',
+                'subtitle-records': 'Upload scanned FRA claim forms to automatically extract information.',
+                'upload-label': 'Upload FRA Claim Form (PDF/Image)',
+                'process-button': 'Process & Extract Data',
+                'extracted-title': 'Extracted Information',
+                'field-village': 'Village:',
+                'field-holder': 'Patta Holder:',
+                'field-coords': 'Coordinates:',
+                'dashboard-title-map': 'Interactive FRA Atlas',
+                'subtitle-map': 'Map-based dashboard showing claims, boundaries, and assets.',
+                'dashboard-title-dss': 'Decision Support Dashboard',
+                'subtitle-dss': 'Analyze FRA claims and identify opportunities for community development.',
+                'total-claims': 'Total Claims Processed',
+                'eligible-pm-kisan': 'Eligible for PM-KISAN',
+                'eligible-mgnrega': 'Eligible for MGNREGA',
+                'low-water-villages': 'Villages with Low Water Index',
+                'dashboard-title-community': 'Community & Feedback',
+                'subtitle-community': 'Patta holders can verify boundaries and submit updates.',
+                'community-patta-id': 'Patta Holder ID',
+                'community-boundary-verification': 'Boundary Verification (GPS Data)',
+                'community-feedback-update': 'Feedback & Updates (e.g., crop info, water availability)',
+                'community-submit-button': 'Submit Feedback',
+                'community-success-title': 'Success!',
+                'community-success-body': 'Your feedback has been submitted. Thank you.',
+                'controls-header': 'Controls',
+                'select-forest': 'Select Forest:',
+                'go-button': 'Go',
+                'tip-label': 'Tip:',
+                'tip-content': 'Use the top-right button on the map to switch modes (Satellite, Light, Dark, etc.).',
+                'modal-title-general': 'Conservation & Wildlife Info',
+                'modal-title-pending': 'Pending Claim Details',
+                'modal-title-tribes': 'About Tribes',
+                'modal-title-habitat': 'About Habitat',
+                'close-button': '×',
+                'forest-satpura': 'Satpura Forest',
+                'forest-gir': 'Gir Forest',
+                'forest-sundarbans': 'Sundarbans',
+                'forest-kanha': 'Kanha National Park',
+                'forest-corbett': 'Jim Corbett National Park',
+                'forest-bandipur': 'Bandipur National Park',
+                'forest-sariska': 'Sariska National Park',
+                'forest-periyar': 'Periyar National Park',
+                'forest-kaziranga': 'Kaziranga National Park',
+                'forest-tadoba': 'Tadoba Andhari Tiger Reserve',
+                'popup-details-title': 'Claim Details',
+                'popup-status': 'Status:',
+                'approved-text': 'Approved',
+                'pending-text': 'Pending',
+                'view-details-btn': 'View Details',
+                'tribes-btn': 'About Tribes',
+                'habitat-btn': 'About Habitat',
+                'reason-label': 'Reason for Pending Status:',
+                'conservation-info': "Protecting forests is crucial for our planet's health. They act as the lungs of the Earth, providing clean air, regulating climate, and serving as a home for countless species of wildlife. Cutting down these trees leads to habitat loss, climate change, and soil erosion. Preserving these habitats is essential for a balanced ecosystem and to prevent the extinction of animals like tigers, elephants, and leopards that live here. Our regulations are in place to ensure these vital natural resources are protected for future generations.",
+                'wildlife-info': 'Each forest has its unique wildlife. For example, the Gir Forest is the last refuge of the *Asiatic lion, while the Sunderbans are home to the **Royal Bengal Tiger. Bandipur is famous for its large population of **Indian elephants* and *leopards*. These animals are an integral part of the forest ecosystem. Protecting their habitat is a primary goal of the Forest Rights Act.',
+                'error-title': 'Error',
+                'error-upload': 'Please select a file to upload first.',
+            },
+            hi: {
+                'app-title': 'वनमित्र',
+                'tab-records': 'रिकॉर्ड्स डिजिटाइज़ेशन',
+                'tab-map': 'वन अधिकार अधिनियम एटलस',
+                'tab-dss': 'निर्णय समर्थन',
+                'tab-community': 'समुदाय और प्रतिक्रिया',
+                'dashboard-title-records': 'वन अधिकार अधिनियम रिकॉर्ड्स डिजिटाइज़ेशन',
+                'subtitle-records': 'जानकारी निकालने के लिए स्कैन किए गए वन अधिकार अधिनियम दावा प्रपत्र अपलोड करें।',
+                'upload-label': 'वन अधिकार अधिनियम दावा प्रपत्र (PDF/छवि) अपलोड करें',
+                'process-button': 'प्रक्रिया और डेटा निकालें',
+                'extracted-title': 'निकाली गई जानकारी',
+                'field-village': 'गाँव:',
+                'field-holder': 'पट्टा धारक:',
+                'field-coords': 'निर्देशांक:',
+                'dashboard-title-map': 'इंटरैक्टिव वन अधिकार अधिनियम एटलस',
+                'subtitle-map': 'दावों, सीमाओं और संपत्तियों को दर्शाने वाला नक्शा-आधारित डैशबोर्ड।',
+                'dashboard-title-dss': 'निर्णय समर्थन डैशबोर्ड',
+                'subtitle-dss': 'वन अधिकार अधिनियम दावों का विश्लेषण करें और सामुदायिक विकास के अवसरों की पहचान करें।',
+                'total-claims': 'कुल संसाधित दावे',
+                'eligible-pm-kisan': 'पीएम-किसान के लिए पात्र',
+                'eligible-mgnrega': 'मनरेगा के लिए पात्र',
+                'low-water-villages': 'कम जल सूचकांक वाले गाँव',
+                'dashboard-title-community': 'समुदाय और प्रतिक्रिया',
+                'subtitle-community': 'पट्टा धारक सीमाओं को सत्यापित कर सकते हैं और अपडेट सबमिट कर सकते हैं।',
+                'community-patta-id': 'पट्टा धारक आईडी',
+                'community-boundary-verification': 'सीमा सत्यापन (जीपीएस डेटा)',
+                'community-feedback-update': 'प्रतिक्रिया और अपडेट (जैसे, फसल की जानकारी, पानी की उपलब्धता)',
+                'community-submit-button': 'प्रतिक्रिया सबमिट करें',
+                'community-success-title': 'सफलता!',
+                'community-success-body': 'आपकी प्रतिक्रिया सबमिट कर दी गई है। धन्यवाद।',
+                'controls-header': 'नियंत्रण',
+                'select-forest': 'वन का चयन करें:',
+                'go-button': 'जाएं',
+                'tip-label': 'टिप:',
+                'tip-content': 'मोड स्विच करने के लिए मानचित्र पर ऊपर-दाएं बटन का उपयोग करें (उपग्रह, प्रकाश, अंधेरा, आदि)।',
+                'modal-title-general': 'संरक्षण और वन्यजीव जानकारी',
+                'modal-title-pending': 'लंबित दावा विवरण',
+                'modal-title-tribes': 'जनजातियों के बारे में',
+                'modal-title-habitat': 'आवास के बारे में',
+                'close-button': '×',
+                'forest-satpura': 'सतपुड़ा वन',
+                'forest-gir': 'गिर वन',
+                'forest-sundarbans': 'सुंदरबन',
+                'forest-kanha': 'कान्हा राष्ट्रीय उद्यान',
+                'forest-corbett': 'जिम कॉर्बेट राष्ट्रीय उद्यान',
+                'forest-bandipur': 'बांदीपुर राष्ट्रीय उद्यान',
+                'forest-sariska': 'सरिस्का राष्ट्रीय उद्यान',
+                'forest-periyar': 'पेरियार राष्ट्रीय उद्यान',
+                'forest-kaziranga': 'काजीरंगा राष्ट्रीय उद्यान',
+                'forest-tadoba': 'ताडोबा अंधारी टाइगर रिजर्व',
+                'popup-details-title': 'दावा विवरण',
+                'popup-status': 'स्थिति:',
+                'approved-text': 'मंजूर',
+                'pending-text': 'लंबित',
+                'view-details-btn': 'विवरण देखें',
+                'tribes-btn': 'जनजातियों के बारे में',
+                'habitat-btn': 'आवास के बारे में',
+                'reason-label': 'लंबित स्थिति का कारण:',
+                'conservation-info': "वनो की रक्षा हमारे ग्रह के स्वास्थ्य के लिए महत्वपूर्ण है। वे पृथ्वी के फेफड़ों के रूप में कार्य करते हैं، स्वच्छ हवा فراہم کرتے ہیں، آب و ہوا کو منظم کرتے हैं اور بے شمار جنگلی حیات کی انواع کے لیے مسکن کا کام کرتے ہیں۔ ان درختوں کو کاٹنے سے مسکن کا نقصان، آب و ہوا میں تبدیلی اور مٹی کا کٹاؤ ہوتا ہے۔ ایک متوازن ماحولیاتی نظام کے لیے اور یہاں رہنے والے شیروں، ہاتھیوں اور چیتا جیسے جانوروں کو معدوم ہونے سے بچانے کے لیے ان مسکنوں کو محفوظ رکھنا ضروری ہے۔ ہمارے قواعد اس بات کو یقینی بنانے کے لیے موجود ہیں کہ یہ اہم قدرتی وسائل مستقبل کی نسلوں کے لیے محفوظ رہیں۔",
+                'wildlife-info': 'ہر جنگل کی اپنی منفرد جنگلی حیات ہوتی ہے۔ مثال کے طور پر، گیر جنگل ایشیائی شیر کی آخری پناہ گاہ ہے، جبکہ سندربن رائل بنگال ٹائیگر کا گھر ہے۔ بنڈیپور ہندوستانی ہاتھیوں اور چیتا کی بڑی آبادی کے لیے مشہور ہے۔ یہ جانور جنگل کے ماحولیاتی نظام کا ایک لازمی حصہ ہیں۔ ان کے مسکن کی حفاظت فارسٹ رائٹس ایکٹ کا ایک بنیادی مقصد ہے۔',
+                'error-title': 'خرابی',
+                'error-upload': 'براہ کرم پہلے اپ لوڈ کرنے کے لیے ایک فائل منتخب کریں۔',
+            },
+            te: {
+                'app-title': 'వనమిత్ర',
+                'tab-records': 'రికార్డ్స్ డిజిటైజేషన్',
+                'tab-map': 'ఎఫ్‌ఆర్‌ఏ అట్లాస్',
+                'tab-dss': 'నిర్ణయ మద్దతు',
+                'tab-community': 'సముదాయం & అభిప్రాయం',
+                'dashboard-title-records': 'ఎఫ్‌ఆర్‌ఏ రికార్డ్స్ డిజిటైజేషన్',
+                'subtitle-records': 'సమాచారాన్ని స్వయంచాలకంగా సంగ్రహించడానికి స్కాన్ చేసిన ఎఫ్‌ఆర్‌ఏ దావా పత్రాలను అప్‌లోడ్ చేయండి.',
+                'upload-label': 'ఎఫ్‌ఆర్‌ఏ దావా పత్రం (PDF/చిత్రం) అప్‌లోడ్ చేయండి',
+                'process-button': 'ప్రక్రియ & డేటాను సంగ్రహించండి',
+                'extracted-title': 'సంగ్రహించిన సమాచారం',
+                'field-village': 'గ్రామం:',
+                'field-holder': 'పట్టా దారుడు:',
+                'field-coords': 'నిరూపకాలు:',
+                'dashboard-title-map': 'ఇంటరాక్టివ్ ఎఫ్‌ఆర్‌ఏ అట్లాస్',
+                'subtitle-map': 'క్లెయిమ్‌లు, సరిహద్దులు మరియు ఆస్తులను చూపించే మ్యాప్ ఆధారిత డాష్‌బోర్డ్.',
+                'dashboard-title-dss': 'నిర్ణయ మద్దతు డాష్‌బోర్డ్',
+                'subtitle-dss': 'ఎఫ్‌ఆర్‌ఏ క్లెయిమ్‌లను విశ్లేషించి, కమ్యూనిటీ అభివృద్ధికి అవకాశాలను గుర్తించండి.',
+                'total-claims': 'మొత్తం క్లెయిమ్‌లు ప్రాసెస్ చేయబడినవి',
+                'eligible-pm-kisan': 'పీఎం-కిసాన్‌కు అర్హులు',
+                'eligible-mgnrega': 'మన్‌రేగాకు అర్హులు',
+                'low-water-villages': 'తక్కువ నీటి సూచిక ఉన్న గ్రామాలు',
+                'dashboard-title-community': 'సముదాయం & అభిప్రాయం',
+                'subtitle-community': 'పట్టాదారులు సరిహద్దులను ధృవీకరించవచ్చు మరియు అప్‌డేట్‌లను సమర్పించవచ్చు.',
+                'community-patta-id': 'పట్టా దారుడు ID',
+                'community-boundary-verification': 'సరిహద్దు ధృవీకరణ (GPS డేటా)',
+                'community-feedback-update': 'అభిప్రాయం & నవీకరణలు (ఉదా. పంట సమాచారం, నీటి లభ్యత)',
+                'community-submit-button': 'అభిప్రాయం సమర్పించండి',
+                'community-success-title': 'విజయం!',
+                'community-success-body': 'మీ అభిప్రాయం సమర్పించబడింది. ధన్యవాదాలు.',
+                'controls-header': 'నియంత్రణలు',
+                'select-forest': 'అడవిని ఎంచుకోండి:',
+                'go-button': 'వెళ్ళండి',
+                'tip-label': 'చిట్కా:',
+                'tip-content': 'మోడ్‌లను మార్చడానికి మ్యాప్‌పై పై-కుడి బటన్‌ను ఉపయోగించండి (శాటిలైట్, లైట్, డార్క్, మొదలైనవి).',
+                'modal-title-general': 'సంరక్షణ & వన్యప్రాణి సమాచారం',
+                'modal-title-pending': 'పెండింగ్‌లో ఉన్న దావా వివరాలు',
+                'modal-title-tribes': 'గిరిజనుల గురించి',
+                'modal-title-habitat': 'ఆవాసం గురించి',
+                'close-button': '×',
+                'forest-satpura': 'సత్పురా అడవి',
+                'forest-gir': 'గిర్ అడవి',
+                'forest-sundarbans': 'సుందర్బన్స్',
+                'forest-kanha': 'కాన్హా జాతీయ ఉద్యానవనం',
+                'forest-corbett': 'జిమ్ కార్బెట్ జాతీయ ఉద్యానవనం',
+                'forest-bandipur': 'బాండిపూర్ జాతీయ ఉద్యానవనం',
+                'forest-sariska': 'సరిస్కా జాతీయ ఉద్యానవనం',
+                'forest-periyar': 'పెరియార్ జాతీయ ఉద్యానవనం',
+                'forest-kaziranga': 'కాజిరంగా జాతీయ ఉద్యానవనం',
+                'forest-tadoba': 'తడోబా అంధారి టైగర్ రిజర్వ్',
+                'popup-details-title': 'దావా వివరాలు',
+                'popup-status': 'స్థితి:',
+                'approved-text': 'ఆమోదించబడినది',
+                'pending-text': 'పెండింగ్‌లో ఉన్నది',
+                'view-details-btn': 'వివరాలు చూడండి',
+                'tribes-btn': 'గిరిజనుల గురించి',
+                'habitat-btn': 'ఆవాసం గురించి',
+                'reason-label': 'పెండింగ్ స్థితికి కారణం:',
+                'conservation-info': "మన గ్రహం యొక్క ఆరోగ్యానికి అటవీ సంరక్షణ చాలా ముఖ్యమైనది. అవి భూమికి ఊపిరితిత్తుల వలె పనిచేస్తాయి, స్వచ్ఛమైన గాలిని అందిస్తాయి, వాతావరణాన్ని నియంత్రిస్తాయి మరియు లెక్కలేనన్ని వన్యప్రాణుల జాతులకు నివాసంగా ఉంటాయి. ఈ చెట్లను నరికివేయడం వలన ఆవాస నష్టం, వాతావరణ మార్పు మరియు నేల కోత సంభవిస్తాయి. సమతుల్య పర్యావరణ వ్యవస్థ కోసం మరియు ఇక్కడ నివసించే పులులు, ఏనుగులు మరియు చిరుతపులులు వంటి జంతువుల అంతరించిపోకుండా నిరోధించడానికి ఈ ఆవాసాలను సంరక్షించడం అవసరం. ఈ ముఖ్యమైన సహజ వనరులు భవిష్యత్ తరాలకు రక్షించబడేలా చూడటానికి మా నిబంధనలు ఉన్నాయి.",
+                'wildlife-info': 'ప్రతి అటవీ ప్రాంతానికి దాని ప్రత్యేకమైన వన్యప్రాణి ఉంటుంది. ఉదాహరణకు, గిర్ అడవి ఆసియాటిక్ సింహానికి చివరి ఆశ్రయం, అయితే సుందర్బన్స్ రాయల్ బెంగాల్ టైగర్‌కు నిలయం. బాండిపూర్ దాని పెద్ద సంఖ్యలో భారతీయ ఏనుగులు మరియు చిరుతపులులకు ప్రసిద్ధి. ఈ జంతువులు అటవీ పర్యావరణ వ్యవస్థలో ఒక అంతర్భాగం. వాటి ఆవాసాలను రక్షించడం అటవీ హక్కుల చట్టం యొక్క ప్రాథమిక లక్ష్యం.',
+                'error-title': 'లోపం',
+                'error-upload': 'దయచేసి ముందుగా అప్‌లోడ్ చేయడానికి ఒక ఫైల్‌ను ఎంచుకోండి.',
+            },
+            ta: {
+                'app-title': 'வன்மித்ரா',
+                'tab-records': 'பதிவுகள் டிஜிட்டலைசேஷன்',
+                'tab-map': 'எஃப்.ஆர்.ஏ அட்லஸ்',
+                'tab-dss': 'முடிவு ஆதரவு',
+                'tab-community': 'சமூகம் மற்றும் கருத்து',
+                'dashboard-title-records': 'எஃப்.ஆர்.ஏ பதிவுகள் டிஜிட்டலைசேஷன்',
+                'subtitle-records': 'தகவல்களை தானாகப் பிரித்தெடுக்க ஸ்கேன் செய்யப்பட்ட எஃப்.ஆர்.ஏ உரிமைப் படிவங்களைப் பதிவேற்றவும்.',
+                'upload-label': 'எஃப்.ஆர்.ஏ உரிமைப் படிவம் (PDF/படம்) பதிவேற்றவும்',
+                'process-button': 'செயலாக்கம் மற்றும் தரவைப் பிரித்தெடுக்கவும்',
+                'extracted-title': 'பிரித்தெடுக்கப்பட்ட தகவல்',
+                'field-village': 'கிராமம்:',
+                'field-holder': 'பட்டா வைத்திருப்பவர்:',
+                'field-coords': 'ஆயங்கள்:',
+                'dashboard-title-map': 'ஊடாடும் எஃப்.ஆர்.ஏ அட்லஸ்',
+                'subtitle-map': 'உரிமைகள், எல்லைகள் மற்றும் சொத்துக்களைக் காட்டும் வரைபட அடிப்படையிலான டாஷ்போர்டு.',
+                'dashboard-title-dss': 'முடிவு ஆதரவு டாஷ்போர்டு',
+                'subtitle-dss': 'எஃப்.ஆர்.ஏ உரிமைகளை பகுப்பாய்வு செய்து சமூக மேம்பாட்டிற்கான வாய்ப்புகளை அடையாளம் காணவும்.',
+                'total-claims': 'மொத்த உரிமைகள் செயலாக்கப்பட்டது',
+                'eligible-pm-kisan': 'பி.எம்-கிசான் திட்டத்திற்கு தகுதியுடையவர்கள்',
+                'eligible-mgnrega': 'எம்.ஜி.என்.ஆர்.இ.ஜி.ஏ திட்டத்திற்கு தகுதியுடையவர்கள்',
+                'low-water-villages': 'குறைந்த நீர் குறியீட்டுடன் கூடிய கிராமங்கள்',
+                'dashboard-title-community': 'சமூகம் மற்றும் கருத்து',
+                'subtitle-community': 'பட்டா வைத்திருப்பவர்கள் எல்லைகளை சரிபார்த்து புதுப்பிப்புகளை சமர்ப்பிக்கலாம்.',
+                'community-patta-id': 'பட்டா வைத்திருப்பவர் ஐடி',
+                'community-boundary-verification': 'எல்லை சரிபார்ப்பு (ஜி.பி.எஸ் தரவு)',
+                'community-feedback-update': 'கருத்து மற்றும் புதுப்பிப்புகள் (எ.கா. பயிர் தகவல், நீர் இருப்பு)',
+                'community-submit-button': 'கருத்தை சமர்ப்பிக்கவும்',
+                'community-success-title': 'வெற்றி!',
+                'community-success-body': 'உங்கள் கருத்து சமர்ப்பிக்கப்பட்டது. நன்றி.',
+                'controls-header': 'கட்டுப்பாடுகள்',
+                'select-forest': 'காட்டைத் தேர்ந்தெடுக்கவும்:',
+                'go-button': 'செல்லவும்',
+                'tip-label': 'குறிப்பு:',
+                'tip-content': 'வரைபடத்தில் மேலே-வலது மூலையில் உள்ள பொத்தானைப் பயன்படுத்தி முறைகளை மாற்றவும் (செயற்கைக்கோள், ஒளி, இருண்ட, முதலியன).',
+                'modal-title-general': 'பாதுகாப்பு மற்றும் வனவிலங்கு தகவல்',
+                'modal-title-pending': 'நிலுவையில் உள்ள உரிமை விவரங்கள்',
+                'modal-title-tribes': 'பழங்குடியினர் பற்றி',
+                'modal-title-habitat': 'வாழ்விடம் பற்றி',
+                'close-button': '×',
+                'forest-satpura': 'சத்ராபுரா காடு',
+                'forest-gir': 'கீர் காடு',
+                'forest-sundarbans': 'சுந்தர்பன்ஸ்',
+                'forest-kanha': 'காணா தேசியப் பூங்கா',
+                'forest-corbett': 'ஜிம் கோர்பெட் தேசியப் பூங்கா',
+                'forest-bandipur': 'பண்டிப்பூர் தேசியப் பூங்கா',
+                'forest-sariska': 'சரிஸ்கா தேசியப் பூங்கா',
+                'forest-periyar': 'பெரியார் தேசியப் பூங்கா',
+                'forest-kaziranga': 'காசிரங்கா தேசியப் பூங்கா',
+                'forest-tadoba': 'தடோபா அந்தாரி புலி காப்பகம்',
+                'popup-details-title': 'உரிமை விவரங்கள்',
+                'popup-status': 'நிலை:',
+                'approved-text': 'அங்கீகரிக்கப்பட்டது',
+                'pending-text': 'நிலுவையில் உள்ளது',
+                'view-details-btn': 'விவரங்களைக் காண்க',
+                'tribes-btn': 'பழங்குடியினர் பற்றி',
+                'habitat-btn': 'வாழ்விடம் பற்றி',
+                'reason-label': 'நிலுவைக்கான காரணம்:',
+                'conservation-info': "நமது கிரகத்தின் ஆரோக்கியத்திற்கு காடுகளைப் பாதுகாப்பது மிகவும் முக்கியமானது. அவை புவிக்கு நுரையீரல் போல் செயல்படுகின்றன, சுத்தமான காற்றை வழங்குகின்றன, காலநிலையை ஒழுங்குபடுத்துகின்றன, மற்றும் எண்ணற்ற வனவிலங்கு இனங்களுக்கு வீடாக உள்ளன. இந்த மரங்களை வெட்டுவதால் வாழ்விட இழப்பு, காலநிலை மாற்றம், மற்றும் மண் அரிப்பு ஏற்படுகிறது. புலி, யானை, மற்றும் சிறுத்தை போன்ற விலங்குகளின் அழிவைத் தடுக்கவும், ஒரு சமச்சீரான சூழலியல் அமைப்பிற்காகவும் இந்த வாழ்விடங்களைப் பாதுகாப்பது அவசியம். இந்த முக்கியமான இயற்கை வளங்களை வருங்கால சந்ததியினருக்கு பாதுகாக்க எங்கள் விதிகள் உள்ளன.",
+                'wildlife-info': 'ஒவ்வொரு காட்டிற்கும் அதன் தனித்துவமான வனவிலங்கு உள்ளது. உதாரணமாக, கீர் காடு ஆசிய சிங்கத்தின் கடைசி புகலிடமாக உள்ளது, அதேசமயம் சுந்தர்பன்ஸ் ராயல் பெங்கால் புலியின் வீடாகும். பண்டிப்பூர் அதன் பெரிய இந்திய யானைகள் மற்றும் சிறுத்தைகள் எண்ணிக்கைக்குப் பிரபலமானது. இந்த விலங்குகள் காட்டு சூழலியல் அமைப்பின் ஒரு முக்கிய பகுதியாகும். அவற்றின் வாழ்விடத்தைப் பாதுகாப்பது வன உரிமைச் சட்டத்தின் ஒரு முதன்மையான இலக்காகும்.',
+                'error-title': 'பிழை',
+                'error-upload': 'முதலில் பதிவேற்ற ஒரு கோப்பைத் தேர்ந்தெடுக்கவும்.',
+            },
+            ka: {
+                'app-title': 'ವನಮಿತ್ರ',
+                'tab-records': 'ದಾಖಲೆಗಳ ಡಿಜಿಟೈಸೇಶನ್',
+                'tab-map': 'ಎಫ್‌ಆರ್‌ಎ ಅಟ್ಲಾಸ್',
+                'tab-dss': 'ನಿರ್ಧಾರ ಬೆಂಬಲ',
+                'tab-community': 'ಸಮುದಾಯ ಮತ್ತು ಪ್ರತಿಕ್ರಿಯೆ',
+                'dashboard-title-records': 'ಎಫ್‌ಆರ್‌ಎ ದಾಖಲೆಗಳ ಡಿಜಿಟೈಸೇಶನ್',
+                'subtitle-records': 'ಮಾಹಿತಿಯನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಹೊರತೆಗೆಯಲು ಸ್ಕ್ಯಾನ್ ಮಾಡಿದ ಎಫ್‌ಆರ್‌ಎ ಹಕ್ಕು ನಮೂನೆಗಳನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.',
+                'upload-label': 'ಎಫ್‌ಆರ್‌ಎ ಹಕ್ಕು ನಮೂನೆ (PDF/ಚಿತ್ರ) ಅಪ್‌ಲೋಡ್ ಮಾಡಿ',
+                'process-button': 'ಪ್ರಕ್ರಿಯೆ ಮತ್ತು ಡೇಟಾ ಹೊರತೆಗೆಯಿರಿ',
+                'extracted-title': 'ಹೊರತೆಗೆದ ಮಾಹಿತಿ',
+                'field-village': 'ಗ್ರಾಮ:',
+                'field-holder': 'ಪತ್ರದಾರರ ಹೆಸರು:',
+                'field-coords': 'ನಿರ್ದೇಶಾಂಕಗಳು:',
+                'dashboard-title-map': 'ಇಂಟರಾಕ್ಟಿವ್ ಎಫ್‌ಆರ್‌ಎ ಅಟ್ಲಾಸ್',
+                'subtitle-map': 'ಹಕ್ಕುಗಳು, ಗಡಿಗಳು ಮತ್ತು ಆಸ್ತಿಗಳನ್ನು ತೋರಿಸುವ ನಕ್ಷೆ-ಆಧಾರಿತ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್.',
+                'dashboard-title-dss': 'ನಿರ್ಧಾರ ಬೆಂಬಲ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್',
+                'subtitle-dss': 'ಎಫ್‌ಆರ್‌ಎ ಹಕ್ಕುಗಳನ್ನು ವಿಶ್ಲೇಷಿಸಿ ಮತ್ತು ಸಮುದಾಯ ಅಭಿವೃದ್ಧಿಗಾಗಿ ಅವಕಾಶಗಳನ್ನು ಗುರುತಿಸಿ.',
+                'total-claims': 'ಒಟ್ಟು ಹಕ್ಕುಗಳು ಪ್ರಕ್ರಿಯೆಯಾಗಿದೆ',
+                'eligible-pm-kisan': 'ಪಿಎಂ-ಕಿಸಾನ್‌ಗೆ ಅರ್ಹರು',
+                'eligible-mgnrega': 'ಮನರೇಗಾಕ್ಕೆ ಅರ್ಹರು',
+                'low-water-villages': 'ಕಡಿಮೆ ನೀರಿನ ಸೂಚ್ಯಂಕ ಹೊಂದಿರುವ ಗ್ರಾಮಗಳು',
+                'dashboard-title-community': 'ಸಮುದಾಯ ಮತ್ತು ಪ್ರತಿಕ್ರಿಯೆ',
+                'subtitle-community': 'ಪತ್ರದಾರರು ಗಡಿಗಳನ್ನು ಪರಿಶೀಲಿಸಬಹುದು ಮತ್ತು ನವೀಕರಣಗಳನ್ನು ಸಲ್ಲಿಸಬಹುದು.',
+                'community-patta-id': 'ಪತ್ರದಾರರ ಐಡಿ',
+                'community-boundary-verification': 'ಗಡಿ ಪರಿಶೀಲನೆ (ಜಿಪಿಎಸ್ ಡೇಟಾ)',
+                'community-feedback-update': 'ಪ್ರತಿಕ್ರಿಯೆ ಮತ್ತು ನವೀಕರಣಗಳು (ಉದಾ. ಬೆಳೆ ಮಾಹಿತಿ, ನೀರಿನ ಲಭ್ಯತೆ)',
+                'community-submit-button': 'ಪ್ರತಿಕ್ರಿಯೆ ಸಲ್ಲಿಸಿ',
+                'community-success-title': 'ಯಶಸ್ಸು!',
+                'community-success-body': 'ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ಸಲ್ಲಿಸಲಾಗಿದೆ. ಧನ್ಯವಾದಗಳು.',
+                'controls-header': 'ನಿಯಂತ್ರಣಗಳು',
+                'select-forest': 'ಅರಣ್ಯವನ್ನು ಆಯ್ಕೆಮಾಡಿ:',
+                'go-button': 'ಹೋಗಿ',
+                'tip-label': 'ಟಿಪ್:',
+                'tip-content': 'ಮ್ಯಾಪ್‌ನಲ್ಲಿ ಮೇಲಿನ-ಬಲಭಾಗದಲ್ಲಿರುವ ಬಟನ್ ಬಳಸಿ ಮೋಡ್‌ಗಳನ್ನು ಬದಲಾಯಿಸಿ (ಉಪಗ್ರಹ, ಬೆಳಕು, ಗಾಢ, ಇತ್ಯಾದಿ).',
+                'modal-title-general': 'ಸಂರಕ್ಷಣೆ ಮತ್ತು ವನ್ಯಜೀವಿ ಮಾಹಿತಿ',
+                'modal-title-pending': 'ಬಾಕಿ ಇರುವ ಹಕ್ಕು ವಿವರಗಳು',
+                'modal-title-tribes': 'ಬುಡಕಟ್ಟು ಜನಾಂಗದ ಬಗ್ಗೆ',
+                'modal-title-habitat': 'ವಾಸಸ್ಥಾನದ ಬಗ್ಗೆ',
+                'close-button': '×',
+                'forest-satpura': 'ಸತ್ಪುರಾ ಅರಣ್ಯ',
+                'forest-gir': 'ಗಿರ್ ಅರಣ್ಯ',
+                'forest-sundarbans': 'ಸುಂದರ್‌ಬನ್ಸ್',
+                'forest-kanha': 'ಕಾನ್ಹಾ ರಾಷ್ಟ್ರೀಯ ಉದ್ಯಾನವನ',
+                'forest-corbett': 'ಜಿಮ್ ಕಾರ್ಬೆಟ್ ರಾಷ್ಟ್ರೀಯ ಉದ್ಯಾನವನ',
+                'forest-bandipur': 'ಬಂಡೀಪುರ ರಾಷ್ಟ್ರೀಯ ಉದ್ಯಾನವನ',
+                'forest-sariska': 'ಸರಿಸ್ಕಾ ರಾಷ್ಟ್ರೀಯ ಉದ್ಯಾನವನ',
+                'forest-periyar': 'ಪೆರಿಯಾರ್ ರಾಷ್ಟ್ರೀಯ ಉದ್ಯಾನವನ',
+                'forest-kaziranga': 'ಕಾಜಿರಂಗಾ ರಾಷ್ಟ್ರೀಯ ಉದ್ಯಾನವನ',
+                'forest-tadoba': 'ತಡೋಬಾ ಅಂಧಾರಿ ಟೈಗರ್ ರಿಸರ್ವ್',
+                'popup-details-title': 'ಹಕ್ಕು ವಿವರಗಳು',
+                'popup-status': 'ಸ್ಥಿತಿ:',
+                'approved-text': 'ಅನುಮೋದಿಸಲಾಗಿದೆ',
+                'pending-text': 'ಬಾಕಿ ಇದೆ',
+                'view-details-btn': 'ವಿವರಗಳನ್ನು ನೋಡಿ',
+                'tribes-btn': 'ಬುಡಕಟ್ಟು ಜನಾಂಗದ ಬಗ್ಗೆ',
+                'habitat-btn': 'ವಾಸಸ್ಥಾನದ ಬಗ್ಗೆ',
+                'reason-label': 'ಬಾಕಿ ಇರುವ ಕಾರಣ:',
+                'conservation-info': "ನಮ್ಮ ಗ್ರಹದ ಆರೋಗ್ಯಕ್ಕೆ ಅರಣ್ಯಗಳನ್ನು ರಕ್ಷಿಸುವುದು ನಿರ್ಣಾಯಕ. ಅವು ಭೂಮಿಯ ಶ್ವಾಸಕೋಶಗಳಾಗಿ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತವೆ, ಶುದ್ಧ ಗಾಳಿಯನ್ನು ಒದಗಿಸುತ್ತವೆ, ಹವಾಮಾನವನ್ನು ನಿಯಂತ್ರಿಸುತ್ತವೆ ಮತ್ತು ಅಸಂಖ್ಯಾತ ವನ್ಯಜೀವಿಗಳಿಗೆ ನೆಲೆಯಾಗಿವೆ. ಈ ಮರಗಳನ್ನು ಕತ್ತರಿಸುವುದರಿಂದ ವಾಸಸ್ಥಾನದ ನಷ್ಟ, ಹವಾಮಾನ ಬದಲಾವಣೆ ಮತ್ತು ಮಣ್ಣಿನ ಸವೆತ ಉಂಟಾಗುತ್ತದೆ. ಸಮತೋಲಿತ ಪರಿಸರ ವ್ಯವಸ್ಥೆಗಾಗಿ ಮತ್ತು ಇಲ್ಲಿ ವಾಸಿಸುವ ಹುಲಿಗಳು, ಆನೆಗಳು ಮತ್ತು ಚಿರತೆಗಳಂತಹ ಪ್ರಾಣಿಗಳ ಅಳಿವಿನಂಚಿನಲ್ಲಿರುವಿಕೆಯನ್ನು ತಡೆಯಲು ಈ ವಾಸಸ್ಥಾನಗಳನ್ನು ಸಂರಕ್ಷಿಸುವುದು ಅತ್ಯಗತ್ಯ. ಈ ಪ್ರಮುಖ ನೈಸರ್ಗಿಕ ಸಂಪನ್ಮೂಲಗಳನ್ನು ಮುಂದಿನ ಪೀಳಿಗೆಗಾಗಿ ರಕ್ಷಿಸಲು ನಮ್ಮ ನಿಯಮಗಳು ಜಾರಿಯಲ್ಲಿವೆ.",
+                'wildlife-info': 'ಪ್ರತಿ ಅರಣ್ಯವು ತನ್ನದೇ ಆದ ವಿಶಿಷ್ಟ ವನ್ಯಜೀವಿಗಳನ್ನು ಹೊಂದಿದೆ. ಉದಾಹರಣೆಗೆ, ಗಿರ್ ಅರಣ್ಯವು ಏಷ್ಯನ್ ಸಿಂಹದ ಕೊನೆಯ ಆಶ್ರಯವಾಗಿದೆ, ಆದರೆ ಸುಂದರ್‌ಬನ್ಸ್ ರಾಯಲ್ ಬೆಂಗಾಲ್ ಟೈಗರ್‌ಗೆ ನೆಲೆಯಾಗಿದೆ. ಬಂಡೀಪುರವು ಅದರ ದೊಡ್ಡ ಭಾರತೀಯ ಆನೆಗಳು ಮತ್ತು ಚಿರತೆಗಳ ಜನಸಂಖ್ಯೆಗೆ ಹೆಸರುವಾಸಿಯಾಗಿದೆ. ಈ ಪ್ರಾಣಿಗಳು ಅರಣ್ಯ ಪರಿಸರ ವ್ಯವಸ್ಥೆಯ ಅವಿಭಾಜ್ಯ ಅಂಗವಾಗಿದೆ. ಅವುಗಳ ವಾಸಸ್ಥಾನವನ್ನು ರಕ್ಷಿಸುವುದು ಅರಣ್ಯ ಹಕ್ಕುಗಳ ಕಾಯ್ದೆಯ ಪ್ರಾಥಮಿಕ ಗುರಿಯಾಗಿದೆ.',
+                'error-title': 'ದೋಷ',
+                'error-upload': 'ದಯವಿಟ್ಟು ಮೊದಲು ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಒಂದು ಫೈಲ್ ಆಯ್ಕೆಮಾಡಿ.',
+            },
+            bn: {
+                'app-title': 'বনমিত্রা',
+                'tab-records': 'রেকর্ডস ডিজিটাইজেশন',
+                'tab-map': 'এফ.আর.এ. অ্যাটলাস',
+                'tab-dss': 'সিদ্ধান্ত সমর্থন',
+                'tab-community': 'সম্প্রদায় ও প্রতিক্রিয়া',
+                'dashboard-title-records': 'এফ.আর.এ. রেকর্ডস ডিজিটাইজেশন',
+                'subtitle-records': 'তথ্য স্বয়ংক্রিয়ভাবে নিষ্কাশন করতে স্ক্যান করা এফ.আর.এ. দাবির ফর্মগুলি আপলোড করুন।',
+                'upload-label': 'এফ.আর.এ. দাবির ফর্ম (পিডিএফ/ছবি) আপলোড করুন',
+                'process-button': 'প্রক্রিয়া ও ডেটা নিষ্কাশন করুন',
+                'extracted-title': 'নিষ্কাশিত তথ্য',
+                'field-village': 'গ্রাম:',
+                'field-holder': 'পাট্টা ধারক:',
+                'field-coords': 'স্থানাঙ্ক:',
+                'dashboard-title-map': 'ইন্টারেক্টিভ এফ.আর.এ. অ্যাটলাস',
+                'subtitle-map': 'দাবি, সীমানা এবং সম্পদ দেখাচ্ছে মানচিত্র-ভিত্তিক ড্যাশবোর্ড।',
+                'dashboard-title-dss': 'সিদ্ধান্ত সমর্থন ড্যাশবোর্ড',
+                'subtitle-dss': 'এফ.আর.এ. দাবিগুলি বিশ্লেষণ করুন এবং সম্প্রদায়ের উন্নয়নের জন্য সুযোগ চিহ্নিত করুন।',
+                'total-claims': 'মোট প্রক্রিয়া করা দাবি',
+                'eligible-pm-kisan': 'পি.এম.-কিষাণ-এর জন্য যোগ্য',
+                'eligible-mgnrega': 'এম.জি.এন.আর.ই.জি.এ.-এর জন্য যোগ্য',
+                'low-water-villages': 'কম জল সূচকযুক্ত গ্রাম',
+                'dashboard-title-community': 'সম্প্রদায় ও প্রতিক্রিয়া',
+                'subtitle-community': 'পাট্টা ধারকরা সীমানা যাচাই করতে এবং আপডেট জমা দিতে পারেন।',
+                'community-patta-id': 'পাট্টা ধারকের আইডি',
+                'community-boundary-verification': 'সীমানা যাচাইকরণ (জি.পি.এস. ডেটা)',
+                'community-feedback-update': 'প্রতিক্রিয়া ও আপডেট (যেমন, ফসলের তথ্য, জলের প্রাপ্যতা)',
+                'community-submit-button': 'প্রতিক্রিয়া জমা দিন',
+                'community-success-title': 'সফল!',
+                'community-success-body': 'আপনার প্রতিক্রিয়া জমা দেওয়া হয়েছে। ধন্যবাদ।',
+                'controls-header': 'নিয়ন্ত্রণ',
+                'select-forest': 'বন নির্বাচন করুন:',
+                'go-button': 'যান',
+                'tip-label': 'টিপ:',
+                'tip-content': 'মোড পরিবর্তন করতে মানচিত্রে উপরের-ডান দিকের বোতাম ব্যবহার করুন (স্যাটেলাইট, হালকা, গাঢ়, ইত্যাদি)।',
+                'modal-title-general': 'সংরক্ষণ ও বন্যপ্রাণীর তথ্য',
+                'modal-title-pending': 'অপেক্ষমান দাবির বিবরণ',
+                'modal-title-tribes': 'উপজাতি সম্পর্কে',
+                'modal-title-habitat': 'আবাসস্থল সম্পর্কে',
+                'close-button': '×',
+                'forest-satpura': 'সাতপুরা বন',
+                'forest-gir': 'গির বন',
+                'forest-sundarbans': 'সুন্দরবন',
+                'forest-kanha': 'কানহা জাতীয় উদ্যান',
+                'forest-corbett': 'জিম করবেট জাতীয় উদ্যান',
+                'forest-bandipur': 'বান্দিপুর জাতীয় উদ্যান',
+                'forest-sariska': 'সরিষ্কা জাতীয় উদ্যান',
+                'forest-periyar': 'পেরিয়ার জাতীয় উদ্যান',
+                'forest-kaziranga': 'কাজিরাঙ্গা জাতীয় উদ্যান',
+                'forest-tadoba': 'তাডোবা অন্ধারি টাইগার রিজার্ভ',
+                'popup-details-title': 'দাবীর বিবরণ',
+                'popup-status': 'অবস্থা:',
+                'approved-text': 'অনুমোদিত',
+                'pending-text': 'অপেক্ষমান',
+                'view-details-btn': 'বিবরণ দেখুন',
+                'tribes-btn': 'উপজাতি সম্পর্কে',
+                'habitat-btn': 'আবাসস্থল সম্পর্কে',
+                'reason-label': 'অপেক্ষমান থাকার কারণ:',
+                'conservation-info': "আমাদের গ্রহের স্বাস্থ্যের জন্য বন সংরক্ষণ অত্যন্ত গুরুত্বপূর্ণ। তারা পৃথিবীর ফুসফুস হিসাবে কাজ করে، পরিষ্কার বাতাস সরবরাহ করে، জলবায়ু নিয়ন্ত্রণ করে এবং অসংখ্য বন্যপ্রাণী প্রজাতির জন্য একটি আবাসস্থল হিসাবে কাজ করে। এই গাছগুলি কেটে ফেলা আবাসস্থল ধ্বংস، জলবায়ু পরিবর্তন এবং মাটি ক্ষয়ের কারণ হয়। একটি ভারসাম্যপূর্ণ বাস্তুতন্ত্রের জন্য এবং এখানে বসবাসকারী বাঘ، হাতি এবং চিতাবাঘের মতো প্রাণীদের বিলুপ্তি রোধ করার জন্য এই আবাসস্থলগুলি সংরক্ষণ করা অপরিহার্য। এই গুরুত্বপূর্ণ প্রাকৃতিক সম্পদগুলি ভবিষ্যত প্রজন্মের জন্য সুরক্ষিত আছে কিনা তা নিশ্চিত করার জন্য আমাদের নিয়মাবলী রয়েছে।",
+                'wildlife-info': 'প্রতিটি বনের নিজস্ব অনন্য বন্যপ্রাণী রয়েছে। উদাহরণস্বরূপ، গির বন এশিয়াটিক সিংহের শেষ আশ্রয়স্থল، যখন সুন্দরবন রয়্যাল বেঙ্গল টাইগারের আবাস। বান্দিপুর তার বিশাল ভারতীয় হাতি এবং চিতাবাঘের জনসংখ্যার জন্য বিখ্যাত। এই প্রাণীগুলি বন বাস্তুতন্ত্রের একটি অবিচ্ছেদ্য অংশ। তাদের আবাসস্থল রক্ষা করা বন অধিকার আইনের একটি প্রাথমিক লক্ষ্য।',
+                'error-title': 'ত্রুটি',
+                'error-upload': 'আপলোড করার জন্য প্রথমে একটি ফাইল নির্বাচন করুন।',
+            },
+            ur: {
+                'app-title': 'ونمترا',
+                'tab-records': 'ریکارڈز ڈیجیٹائزیشن',
+                'tab-map': 'ایف آر اے اٹلس',
+                'tab-dss': 'فیصلہ سپورٹ',
+                'tab-community': 'کمیونٹی اور فیڈ بیک',
+                'dashboard-title-records': 'ایف آر اے ریکارڈز ڈیجیٹائزیشن',
+                'subtitle-records': 'معلومات خودکار طریقے سے نکالنے کے لیے اسکین شدہ ایف آر اے کلیم فارم اپ لوڈ کریں۔',
+                'upload-label': 'ایف آر اے کلیم فارم (پی ڈی ایف/تصویر) اپ لوڈ کریں',
+                'process-button': 'عمل اور ڈیٹا نکالیں',
+                'extracted-title': 'نکالی گئی معلومات',
+                'field-village': 'گاؤں:',
+                'field-holder': 'پٹہ ہولڈر:',
+                'field-coords': 'پوائنٹس:',
+                'dashboard-title-map': 'انٹرایکٹو ایف آر اے اٹلس',
+                'subtitle-map': 'دعووں، حدود اور اثاثوں کو دکھانے والا نقشہ پر مبنی ڈیش بورڈ۔',
+                'dashboard-title-dss': 'فیصلہ سپورٹ ڈیش بورڈ',
+                'subtitle-dss': 'ایف آر اے دعووں کا تجزیہ کریں اور کمیونٹی کی ترقی کے مواقع کی شناخت کریں۔',
+                'total-claims': 'کل پروسیس شدہ دعوے',
+                'eligible-pm-kisan': 'پی ایم-کیسان کے لیے اہل',
+                'eligible-mgnrega': 'منریگا کے لیے اہل',
+                'low-water-villages': 'کم پانی انڈیکس والے گاؤں',
+                'dashboard-title-community': 'کمیونٹی اور فیڈ بیک',
+                'subtitle-community': 'پٹہ ہولڈرز حدود کی تصدیق کر سکتے ہیں اور اپ ڈیٹس جمع کرا سکتے ہیں۔',
+                'community-patta-id': 'پٹہ ہولڈر آئی ڈی',
+                'community-boundary-verification': 'حدود کی تصدیق (جی پی ایس ڈیٹا)',
+                'community-feedback-update': 'فیڈ بیک اور اپ ڈیٹس (جیسے، فصل کی معلومات، پانی کی دستیابی)',
+                'community-submit-button': 'فیڈ بیک جمع کریں',
+                'community-success-title': 'کامیابی!',
+                'community-success-body': 'آپ کا فیڈ بیک جمع کر دیا گیا ہے۔ شکریہ۔',
+                'controls-header': 'کنٹرولز',
+                'select-forest': 'جنگل منتخب کریں:',
+                'go-button': 'جائیں',
+                'tip-label': 'ٹپ:',
+                'tip-content': 'موڈز تبدیل کرنے کے لیے نقشہ پر اوپری دائیں بٹن کا استعمال کریں (سیٹلائٹ، لائٹ، ڈارک، وغیرہ)۔',
+                'modal-title-general': 'تحفظ اور جنگلی حیات کی معلومات',
+                'modal-title-pending': 'زیر التوا دعوے کی تفصیلات',
+                'modal-title-tribes': 'قبائل کے بارے میں',
+                'modal-title-habitat': 'مسکن کے بارے میں',
+                'close-button': '×',
+                'forest-satpura': 'ستپورا جنگل',
+                'forest-gir': 'گیر جنگل',
+                'forest-sundarbans': 'سندربن',
+                'forest-kanha': 'کانہا نیشنل پارک',
+                'forest-corbett': 'جم کاربیٹ نیشنل پارک',
+                'forest-bandipur': 'بنڈیپور نیشنل پارک',
+                'forest-sariska': 'سرسکا نیشنل پارک',
+                'forest-periyar': 'پیریار نیشنل پارک',
+                'forest-kaziranga': 'کازیرنگا نیشنل پارک',
+                'forest-tadoba': 'تاڈوبا اندھاری ٹائیگر ریزرو',
+                'popup-details-title': 'دعوے کی تفصیلات',
+                'popup-status': 'حیثیت:',
+                'approved-text': 'منظور شدہ',
+                'pending-text': 'زیر التوا',
+                'view-details-btn': 'تفصیلات دیکھیں',
+                'tribes-btn': 'قبائل کے بارے میں',
+                'habitat-btn': 'مسکن کے بارے میں',
+                'reason-label': 'زیر التوا حیثیت کی وجہ:',
+                'conservation-info': "جنگلات کی حفاظت ہمارے سیارے کی صحت کے لیے بہت اہم ہے۔ وہ زمین کے پھیپھڑوں کی طرح کام کرتے ہیں، صاف ہوا فراہم کرتے ہیں، آب و ہوا کو منظم کرتے ہیں اور بے شمار جنگلی حیات کی انواع کے لیے مسکن کا کام کرتے ہیں۔ ان درختوں کو کاٹنے سے مسکن کا نقصان، آب و ہوا میں تبدیلی اور مٹی کا کٹاؤ ہوتا ہے۔ ایک متوازن ماحولیاتی نظام کے لیے اور یہاں رہنے والے شیروں، ہاتھیوں اور چیتا جیسے جانوروں کو معدوم ہونے سے بچانے کے لیے ان مسکنوں کو محفوظ رکھنا ضروری ہے۔ ہمارے قواعد اس بات کو یقینی بنانے کے لیے موجود ہیں کہ یہ اہم قدرتی وسائل مستقبل کی نسلوں کے لیے محفوظ رہیں۔",
+                'wildlife-info': 'ہر جنگل کی اپنی منفرد جنگلی حیات ہوتی ہے۔ مثال کے طور پر، گیر جنگل ایشیائی شیر کی آخری پناہ گاہ ہے، جبکہ سندربن رائل بنگال ٹائیگر کا گھر ہے۔ بنڈیپور ہندوستانی ہاتھیوں اور چیتا کی بڑی آبادی کے لیے مشہور ہے۔ یہ جانور جنگل کے ماحولیاتی نظام کا ایک لازمی حصہ ہیں۔ ان کے مسکن کی حفاظت فارسٹ رائٹس ایکٹ کا ایک بنیادی مقصد ہے۔',
+                'error-title': 'خرابی',
+                'error-upload': 'براہ کرم پہلے اپ لوڈ کرنے کے لیے ایک فائل منتخب کریں۔',
+            },
+            ml: {
+                'app-title': 'വൻമിത്ര',
+                'tab-records': 'രേഖകളുടെ ഡിജിറ്റൈസേഷൻ',
+                'tab-map': 'എഫ്.ആർ.എ. അറ്റ്ലസ്',
+                'tab-dss': 'തീരുമാന പിന്തുണ',
+                'tab-community': 'സമൂഹം & ഫീഡ്‌ബാക്ക്',
+                'dashboard-title-records': 'എഫ്.ആർ.എ. രേഖകളുടെ ഡിജിറ്റൈസേഷൻ',
+                'subtitle-records': 'വിവരങ്ങൾ സ്വയമേവ വേർതിരിച്ചെടുക്കാൻ സ്കാൻ ചെയ്ത എഫ്.ആർ.എ. ക്ലെയിം ഫോമുകൾ അപ്‌ലോഡ് ചെയ്യുക.',
+                'upload-label': 'എഫ്.ആർ.എ. ക്ലെയിം ഫോം (പിഡിഎഫ്/ചിത്രം) അപ്‌ലോഡ് ചെയ്യുക',
+                'process-button': 'പ്രോസസ്സ് ചെയ്ത് ഡാറ്റ വേർതിരിക്കുക',
+                'extracted-title': 'വേർതിരിച്ചെടുത്ത വിവരങ്ങൾ',
+                'field-village': 'ഗ്രാമം:',
+                'field-holder': 'പട്ടാ ഉടമ:',
+                'field-coords': 'കോർഡിനേറ്റുകൾ:',
+                'dashboard-title-map': 'ഇന്ററാക്ടീവ് എഫ്.ആർ.എ. അറ്റ്ലസ്',
+                'subtitle-map': 'ക്ലെയിമുകൾ, അതിരുകൾ, ആസ്തികൾ എന്നിവ കാണിക്കുന്ന മാപ്പ് അടിസ്ഥാനമാക്കിയുള്ള ഡാഷ്ബോർഡ്.',
+                'dashboard-title-dss': 'തീരുമാന പിന്തുണ ഡാഷ്ബോർഡ്',
+                'subtitle-dss': 'എഫ്.ആർ.എ. ക്ലെയിമുകൾ വിശകലനം ചെയ്യുക, സമൂഹ വികസനത്തിനുള്ള അവസരങ്ങൾ കണ്ടെത്തുക.',
+                'total-claims': 'മൊത്തം പ്രോസസ്സ് ചെയ്ത ക്ലെയിമുകൾ',
+                'eligible-pm-kisan': 'പി.എം.-കിസാൻ-ന് അർഹതയുണ്ട്',
+                'eligible-mgnrega': 'എം.ജി.എൻ.ആർ.ഇ.ജി.എ-യ്ക്ക് അർഹതയുണ്ട്',
+                'low-water-villages': 'കുറഞ്ഞ ജലസൂചികയുള്ള ഗ്രാമങ്ങൾ',
+                'dashboard-title-community': 'സമൂഹം & ഫീഡ്‌ബാക്ക്',
+                'subtitle-community': 'പട്ടാ ഉടമകൾക്ക് അതിരുകൾ പരിശോധിക്കാനും അപ്‌ഡേറ്റുകൾ സമർപ്പിക്കാനും കഴിയും.',
+                'community-patta-id': 'പട്ടാ ഉടമ ഐഡി',
+                'community-boundary-verification': 'അതിർത്തി പരിശോധന (ജി.പി.എസ്. ഡാറ്റ)',
+                'community-feedback-update': 'ഫീഡ്‌ബാക്കും അപ്‌ഡേറ്റുകളും (ഉദാ. വിള വിവരങ്ങൾ, ജലലഭ്യത)',
+                'community-submit-button': 'ഫീഡ്‌ബാക്ക് സമർപ്പിക്കുക',
+                'community-success-title': 'വിജയം!',
+                'community-success-body': 'നിങ്ങളുടെ ഫീഡ്‌ബാക്ക് സമർപ്പിച്ചിരിക്കുന്നു. നന്ദി.',
+                'controls-header': 'നിയന്ത്രണങ്ങൾ',
+                'select-forest': 'വനം തിരഞ്ഞെടുക്കുക:',
+                'go-button': 'പോകുക',
+                'tip-label': 'നുറുങ്ങ്:',
+                'tip-content': 'മോഡുകൾ മാറ്റാൻ മാപ്പിലെ മുകളിൽ-വലത് ബട്ടൺ ഉപയോഗിക്കുക (സാറ്റലൈറ്റ്, ലൈറ്റ്, ഡാർക്ക്, മുതലായവ).',
+                'modal-title-general': 'സംരക്ഷണം & വന്യജീവി വിവരങ്ങൾ',
+                'modal-title-pending': 'തീർപ്പാക്കാത്ത ക്ലെയിം വിവരങ്ങൾ',
+                'modal-title-tribes': 'ഗോത്രങ്ങളെക്കുറിച്ച്',
+                'modal-title-habitat': 'ആവാസവ്യവസ്ഥയെക്കുറിച്ച്',
+                'close-button': '×',
+                'forest-satpura': 'സത്പുര വനം',
+                'forest-gir': 'ഗിർ വനം',
+                'forest-sundarbans': 'സുന്ദർബൻസ്',
+                'forest-kanha': 'കൻഹ ദേശീയോദ്യാനം',
+                'forest-corbett': 'ജിം കോർബറ്റ് ദേശീയോദ്യാനം',
+                'forest-bandipur': 'ബാന്ദിപൂർ ദേശീയോദ്യാനം',
+                'forest-sariska': 'സരിസ്ക ദേശീയോദ്യാനം',
+                'forest-periyar': 'പെരിയാർ ദേശീയോദ്യാനം',
+                'forest-kaziranga': 'കാസിരംഗ ദേശീയോദ്യാനം',
+                'forest-tadoba': 'താഡോബ അന്ധാരി ടൈഗർ റിസർവ്',
+                'popup-details-title': 'ക്ലെയിം വിവരങ്ങൾ',
+                'popup-status': 'സ്ഥിതി:',
+                'approved-text': 'അംഗീകരിച്ചു',
+                'pending-text': 'തീർപ്പാക്കാത്തത്',
+                'view-details-btn': 'വിശദാംശങ്ങൾ കാണുക',
+                'tribes-btn': 'ഗോത്രങ്ങളെക്കുറിച്ച്',
+                'habitat-btn': 'ആവാസവ്യവസ്ഥയെക്കുറിച്ച്',
+                'reason-label': 'തീർപ്പാക്കാത്തതിന്റെ കാരണം:',
+                'conservation-info': "നമ്മുടെ ഗ്രഹത്തിന്‍റെ ആരോഗ്യത്തിന് വനങ്ങൾ സംരക്ഷിക്കേണ്ടത് നിർണായകമാണ്. അവ ഭൂമിയുടെ ശ്വാസകോശങ്ങളായി പ്രവർത്തിക്കുന്നു, ശുദ്ധവായു നൽകുന്നു, കാലാവസ്ഥ നിയന്ത്രിക്കുന്നു, കൂടാതെ എണ്ണമറ്റ വന്യജീവികൾക്ക് ഒരു വീടായി വർത്തിക്കുന്നു. ഈ മരങ്ങൾ വെട്ടുന്നത് ആവാസവ്യവസ്ഥയുടെ നഷ്ടം, കാലാവസ്ഥാ വ്യതിയാനം, മണ്ണൊലിപ്പ് എന്നിവയ്ക്ക് കാരണമാകുന്നു. സന്തുലിതമായ ഒരു ആവാസവ്യവസ്ഥയ്ക്കും ഇവിടെ വസിക്കുന്ന കടുവകൾ, ആനകൾ, പുള്ളിപ്പുലികൾ എന്നിവ പോലുള്ള മൃഗങ്ങളുടെ വംശനാശം തടയുന്നതിനും ഈ ആവാസവ്യവസ്ഥകൾ സംരക്ഷിക്കേണ്ടത് അത്യന്താപേക്ഷിതമാണ്. ഈ സുപ്രധാന പ്രകൃതി വിഭവങ്ങൾ ഭാവി തലമുറകൾക്കായി സംരക്ഷിക്കപ്പെടുന്നു എന്ന് ഉറപ്പാക്കാൻ ഞങ്ങളുടെ നിയമങ്ങൾ നിലവിലുണ്ട്.",
+                'wildlife-info': 'ഓരോ വനത്തിനും അതിൻ്റേതായ അതുല്യമായ വന്യജീവികളുണ്ട്. ഉദാഹരണത്തിന്, ഏഷ്യാറ്റിക് സിംഹത്തിൻ്റെ അവസാനത്തെ അഭയകേന്ദ്രമാണ് ഗിർ വനം, അതേസമയം സുന്ദർബൻസ് റോയൽ ബംഗാൾ കടുവയുടെ ആവാസകേന്ദ്രമാണ്. ബാന്ദിപൂർ ഇന്ത്യൻ ആനകളുടെയും പുള്ളിപ്പുലികളുടെയും വലിയ ജനസംഖ്യയ്ക്ക് പേരുകേട്ടതാണ്. ഈ മൃഗങ്ങൾ വന ആവാസവ്യവസ്ഥയുടെ അവിഭാജ്യ ഘടകമാണ്. അവയുടെ ആവാസവ്യവസ്ഥ സംരക്ഷിക്കുക എന്നത് വനാവകാശ നിയമത്തിന്റെ ഒരു പ്രാഥമിക ലക്ഷ്യമാണ്.',
+                'error-title': 'പിശക്',
+                'error-upload': 'ദയവായി ആദ്യം അപ്‌ലോഡ് ചെയ്യാൻ ഒരു ഫയൽ തിരഞ്ഞെടുക്കുക.',
+            },
+        };
+
+        // Data for different forests, including coordinates, claims, and info
+        const forests = {
+            satpura: {
+                name: 'Satpura Forest',
+                coords: [
+                    [[22, 77], [22, 78], [23, 78], [23, 77], [22, 77]]
+                ],
+                claims: [
+                    { lat: 22.5, lon: 77.5, status: 'Approved' },
+                    {
+                        lat: 22.6,
+                        lon: 77.8,
+                        status: 'Pending',
+                        reason: 'The proposed claim area overlaps with a critical tiger habitat, requiring an assessment from the National Tiger Conservation Authority (NTCA).',
+                    },
+                ],
+                tribalInfo: 'The *Gonds* and *Korku* are prominent tribal communities in this region. The Gonds, one of the largest tribal groups in India, are known for their traditional art, while the Korku community has a deep-rooted knowledge of local medicinal plants and forest resources.',
+                habitatInfo: 'This region is dominated by *Central Indian deciduous forests*, with Sal and teak being the most common trees. The park serves as a vital wildlife corridor, connecting various ecosystems and supporting a rich variety of flora and fauna.',
+            },
+            gir: {
+                name: 'Gir Forest',
+                coords: [
+                    [[21, 70], [21, 71], [22, 71], [22, 70], [21, 70]]
+                ],
+                claims: [
+                    { lat: 21.5, lon: 70.5, status: 'Approved' },
+                    {
+                        lat: 21.2,
+                        lon: 70.7,
+                        status: 'Pending',
+                        reason: 'A survey report from the District Level Committee indicates the presence of a sacred grove within the claimed area, which is a protected religious site.',
+                    },
+                ],
+                tribalInfo: 'The *Maldharis* and *Siddis* are the main communities. The Maldharis are a pastoral community known for their unique co-existence with the Asiatic lions, while the Siddis, of African descent, are known for their unique martial arts and dance forms.',
+                habitatInfo: 'The habitat here is primarily a *dry deciduous forest and thorny scrub. Gir is the only place in the world where the **Asiatic lion* is found in the wild. The Teliya and Shetrunji rivers flow through the region, providing crucial water sources.',
+            },
+            sundarbans: {
+                name: 'Sundarbans',
+                coords: [
+                    [[21, 88], [21, 89], [22, 89], [22, 88], [21, 88]]
+                ],
+                claims: [
+                    {
+                        lat: 21.5,
+                        lon: 88.5,
+                        status: 'Pending',
+                        reason: 'The claim is located in a core tiger reserve zone, where habitation is restricted under forest laws for the conservation of the Royal Bengal Tiger.',
+                    },
+                    { lat: 21.7, lon: 88.7, status: 'Approved' },
+                ],
+                tribalInfo: 'The surrounding areas are home to various *Adivasi communities, including the **Mundas*. These indigenous people have a long history of living in this challenging mangrove environment, traditionally relying on the forest and waterways for their livelihood.',
+                habitatInfo: 'The *world\'s largest mangrove forest, the Sundarbans is a unique habitat of tidal waterways, mudflats, and small islands. The **Sundari tree, after which the forest is named, is the most common species. It is a critical habitat for the **Royal Bengal Tiger* and saltwater crocodiles.',
+            },
+            kanha: {
+                name: 'Kanha National park',
+                coords: [
+                    [[22.1, 80.4], [22.1, 80.8], [22.5, 80.8], [22.5, 80.4], [22.1, 80.4]]
+                ],
+                claims: [
+                    { lat: 22.3, lon: 80.6, status: 'Approved' },
+                    {
+                        lat: 22.2,
+                        lon: 80.5,
+                        status: 'Pending',
+                        reason: 'The claim pertains to land for communal use, but the proposal lacks a clear plan for equitable distribution and management among the community members.',
+                    },
+                ],
+                tribalInfo: 'The *Baiga* and *Gond* tribes are the main inhabitants of this region. The Baiga, a particularly vulnerable tribal group, are known for their deep-seated knowledge of the forest and a lifestyle intertwined with nature.',
+                habitatInfo: 'The landscape is a mix of tropical moist deciduous and dry deciduous forests. A major feature is the vast *grasslands and savannas, which provide a crucial habitat for the **barasingha* (swamp deer), a species brought back from the brink of extinction here.',
+            },
+            corbett: {
+                name: 'Jim Corbett National park',
+                coords: [
+                    [[29.4, 78.7], [29.4, 79.1], [29.6, 79.1], [29.6, 78.7], [29.4, 78.7]]
+                ],
+                claims: [
+                    {
+                        lat: 29.5,
+                        lon: 78.8,
+                        status: 'Pending',
+                        reason: 'The proposed title claim area is located on a river bank and could potentially lead to habitat fragmentation, impacting the movement of elephants.',
+                    },
+                    { lat: 29.45, lon: 79.0, status: 'Approved' },
+                ],
+                tribalInfo: 'The *Gujjars, a pastoral community, are historically found in the buffer zones of this park. They traditionally practice **transhumance*, moving their livestock between high-altitude pastures and lower regions with the seasons.',
+                habitatInfo: 'The landscape is a unique blend of *Sal forests, moist deciduous forests, and riverine grasslands. The **Ramganga river* flows through the park, providing a vital source of water and a core habitat for a high density of tigers and elephants.',
+            },
+            bandipur: {
+                name: 'Bandipur National park',
+                coords: [
+                    [[11.5, 76.4], [11.5, 76.8], [11.7, 76.8], [11.7, 76.4], [11.5, 76.4]]
+                ],
+                claims: [
+                    { lat: 11.6, lon: 76.5, status: 'Approved' },
+                    {
+                        lat: 11.65,
+                        lon: 76.7,
+                        status: 'Pending',
+                        reason: "The application for a community forest resource right lacks a clear demarcation of boundaries, leading to an overlap with a neighboring village's claim.",
+                    },
+                ],
+                tribalInfo: 'The *Soliga* and *Kuruba* tribes are historically linked to the region. The Soligas are an indigenous community known for their traditional knowledge of forest resources, particularly honey collection, while the Kuruba community are traditionally shepherds and weavers.',
+                habitatInfo: 'This area is characterized by *dry deciduous forests* and open grassy woodlands. As a major part of the *Nilgiri Biosphere Reserve, it is famous for its large population of **elephants, gaurs* (Indian bison), and *leopards*.',
+            },
+            sariska: {
+                name: 'Sariska National park',
+                coords: [
+                    [[27.3, 76.2], [27.3, 76.4], [27.5, 76.4], [27.5, 76.2], [27.3, 76.2]]
+                ],
+                claims: [
+                    { lat: 27.4, lon: 76.3, status: 'Approved' },
+                    {
+                        lat: 27.45,
+                        lon: 76.25,
+                        status: 'Pending',
+                        reason: 'The land claim is in a core tiger breeding zone, which is critical for the conservation and re-population efforts of the Bengal Tiger.',
+                    },
+                ],
+                tribalInfo: 'The *Meena* community is one of the most prominent tribal groups in this region, with a deep history connected to the Aravalli hills and forests.',
+                habitatInfo: 'The landscape of Sariska is primarily *dry deciduous forests*, consisting of Dhok trees. It is well-known for being one of the first national parks in India to successfully relocate tigers.',
+            },
+            periyar: {
+                name: 'Periyar National Park',
+                coords: [
+                    [[9.3, 77.0], [9.3, 77.2], [9.6, 77.2], [9.6, 77.0], [9.3, 77.0]]
+                ],
+                claims: [
+                    { lat: 9.4, lon: 77.1, status: 'Approved' },
+                    {
+                        lat: 9.5,
+                        lon: 77.15,
+                        status: 'Pending',
+                        reason: 'The proposed area is part of a crucial elephant migration corridor, which must remain undisturbed to ensure wildlife movement.',
+                    },
+                ],
+                tribalInfo: 'The *Mannans, **Paliyan, and **Oorali* are the major tribal communities in and around Periyar. Their traditional knowledge of the forest and its resources is vital for the park\'s conservation efforts.',
+                habitatInfo: 'The park is famous for its evergreen and moist deciduous forests, with the *Periyar lake* at its center. This diverse habitat is a major elephant and tiger reserve, also home to the highly endemic Malabar Grey Hornbill.',
+            },
+            kaziranga: {
+                name: 'Kaziranga National Park',
+                coords: [
+                    [[26.5, 93.0], [26.5, 93.4], [26.7, 93.4], [26.7, 93.0], [26.5, 93.0]]
+                ],
+                claims: [
+                    { lat: 26.6, lon: 93.1, status: 'Approved' },
+                    {
+                        lat: 26.65,
+                        lon: 93.2,
+                        status: 'Pending',
+                        reason: 'The claim falls within a high-priority conservation area for the Great Indian One-Horned Rhinoceros, and is subject to strict habitat protection laws.',
+                    },
+                ],
+                tribalInfo: 'The *Karbi* and *Mising* tribes have lived in the region for centuries, with traditions and customs closely linked to the forest and the Brahmaputra River.',
+                habitatInfo: 'Kaziranga is a unique blend of *tall elephant grass, marshy swamps, and dense tropical forests. The Brahmaputra River flows along its boundary, flooding the park annually and creating a fertile ground for its grasslands, which are the primary habitat for the world\'s largest population of **one-horned rhinoceroses*.',
+            },
+            tadoba: {
+                name: 'Tadoba Andhari Tiger Reserve',
+                coords: [
+                    [[20.2, 79.2], [20.2, 79.4], [20.4, 79.4], [20.4, 79.2], [20.2, 79.2]]
+                ],
+                claims: [
+                    { lat: 20.3, lon: 79.3, status: 'Approved' },
+                    {
+                        lat: 20.35,
+                        lon: 79.35,
+                        status: 'Pending',
+                        reason: 'A claim for a forest title is pending due to an ongoing review of its potential impact on a local water source vital for the wildlife in the reserve.',
+                    },
+                ],
+                tribalInfo: 'The *Gond* and *Kolam* tribes are the indigenous inhabitants of the Tadoba region, known for their strong cultural ties to the forest and traditional practices of resource management.',
+                habitatInfo: 'Tadoba is a dry deciduous forest dominated by *teak trees* and stands out for its high density of tigers. The reserve also boasts a rich diversity of wildlife, including leopards, sloth bears, and wild dogs.',
+            },
+        };
+
+        const mockExtractedData = {
+            village: "Baramunda",
+            holder: "Suresh Kumar",
+            coords: "20.2961° N, 85.8245° E"
+        };
+        const mockDSSData = {
+            claims: [
+                { id: 1, waterIndex: 0.3, eligiblePMKisan: true, eligibleMGNREGA: true },
+                { id: 2, waterIndex: 0.8, eligiblePMKisan: false, eligibleMGNREGA: true },
+                { id: 3, waterIndex: 0.1, eligiblePMKisan: true, eligibleMGNREGA: false },
+                { id: 4, waterIndex: 0.9, eligiblePMKisan: true, eligibleMGNREGA: true },
+                { id: 5, waterIndex: 0.2, eligiblePMKisan: false, eligibleMGNREGA: true },
+                { id: 6, waterIndex: 0.7, eligiblePMKisan: true, eligibleMGNREGA: false },
+            ],
+            villages: [
+                { name: 'Purbagada', waterIndex: 0.3 },
+                { name: 'Khandagiri', waterIndex: 0.1 },
+                { name: 'Baramunda', waterIndex: 0.9 }
+            ]
+        };
+
+        const dssForestData = {
+            'Sundarbans': {
+                area: '1,500,000 ha',
+                deforestation: [950, 850, 750, 650, 500, 480, 450, 420, 390, 350],
+                afforestation: [300, 350, 400, 450, 500, 520, 550, 580, 610, 650],
+                treeDensity: 120,
+                biodiversityIndex: 8.5,
+                waterLevel: 25.1,
+                ecosystemValue: 125,
+                threatLevel: 'Low'
+            },
+            'Gir forest': {
+                area: '1,412 ha',
+                deforestation: [95, 85, 75, 65, 55, 52, 48, 45, 42, 38],
+                afforestation: [30, 35, 40, 45, 50, 55, 60, 65, 70, 75],
+                treeDensity: 90,
+                biodiversityIndex: 7.8,
+                waterLevel: 15.3,
+                ecosystemValue: 95,
+                threatLevel: 'Medium'
+            },
+            'Kanha National park': {
+                area: '940 ha',
+                deforestation: [62, 58, 55, 50, 45, 42, 38, 35, 32, 30],
+                afforestation: [20, 22, 25, 28, 30, 33, 36, 39, 42, 45],
+                treeDensity: 150,
+                biodiversityIndex: 9.1,
+                waterLevel: 18.7,
+                ecosystemValue: 150,
+                threatLevel: 'Very Low'
+            },
+            'Jim Corbett National park': {
+                area: '520 ha',
+                deforestation: [42, 40, 38, 35, 30, 28, 25, 22, 20, 18],
+                afforestation: [12, 14, 16, 18, 20, 22, 25, 28, 30, 32],
+                treeDensity: 110,
+                biodiversityIndex: 8.3,
+                waterLevel: 22.4,
+                ecosystemValue: 110,
+                threatLevel: 'Very Low'
+            },
+            'Satpura forest': {
+                area: '1,427 ha',
+                deforestation: [85, 82, 80, 75, 70, 68, 65, 62, 60, 55],
+                afforestation: [25, 28, 30, 32, 35, 38, 40, 42, 45, 48],
+                treeDensity: 105,
+                biodiversityIndex: 8.1,
+                waterLevel: 19.8,
+                ecosystemValue: 105,
+                threatLevel: 'Low'
+            },
+            'Bandipur National forest': {
+                area: '874 ha',
+                deforestation: [55, 52, 50, 48, 45, 42, 40, 38, 35, 32],
+                afforestation: [15, 18, 20, 22, 25, 28, 30, 33, 35, 38],
+                treeDensity: 130,
+                biodiversityIndex: 8.9,
+                waterLevel: 16.5,
+                ecosystemValue: 130,
+                threatLevel: 'Low'
+            },
+            'Sariska National park': {
+                area: '866 ha',
+                deforestation: [50, 48, 45, 42, 40, 38, 35, 32, 30, 28],
+                afforestation: [10, 12, 15, 18, 20, 22, 25, 28, 30, 32],
+                treeDensity: 95,
+                biodiversityIndex: 7.5,
+                waterLevel: 12.9,
+                ecosystemValue: 90,
+                threatLevel: 'Medium'
+            },
+            'Periyar National Park': {
+                area: '925 ha',
+                deforestation: [45, 42, 40, 38, 35, 32, 30, 28, 25, 22],
+                afforestation: [7, 9, 11, 13, 15, 18, 20, 22, 25, 28],
+                treeDensity: 140,
+                biodiversityIndex: 9.3,
+                waterLevel: 24.5,
+                ecosystemValue: 145,
+                threatLevel: 'Very Low'
+            },
+            'Kaziranga National Park': {
+                area: '625 ha',
+                deforestation: [35, 32, 30, 28, 25, 22, 20, 18, 15, 12],
+                afforestation: [12, 14, 16, 18, 20, 22, 25, 28, 30, 32],
+                treeDensity: 125,
+                biodiversityIndex: 8.7,
+                waterLevel: 17.6,
+                ecosystemValue: 120,
+                threatLevel: 'Very Low'
+            },
+            'Tadoba Andhari Tiger Reserve': {
+                area: '625 ha',
+                deforestation: [35, 32, 30, 28, 25, 22, 20, 18, 15, 12],
+                afforestation: [12, 14, 16, 18, 20, 22, 25, 28, 30, 32],
+                treeDensity: 125,
+                biodiversityIndex: 8.7,
+                waterLevel: 17.6,
+                ecosystemValue: 120,
+                threatLevel: 'Very Low'
+            }
+        };
+
+        let mapInstance = null;
+        let forestLayer = null;
+        let claimsLayer = null;
+        const languageSelect = document.getElementById('languageSelect');
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const modalOverlay = document.getElementById('pendingModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const modalBodyEl = document.getElementById('modalBody');
+        const modalTitleEl = document.querySelector('.modal-title');
+        let deforestationChart;
+        let afforestationChart;
+        let currentForestName = 'Sundarbans';
+
+        // Core Functions
+        //--------------------------------------------------------------------------------
+
+        function translatePage() {
+            const lang = languageSelect.value;
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                if (translations[lang] && translations[lang][key]) {
+                    element.textContent = translations[lang][key];
+                }
+            });
+            if (document.getElementById('content-map').classList.contains('active')) {
+                updateMap();
+            }
+        }
+
+        function showModal(titleKey, content) {
+            const lang = languageSelect.value;
+            modalTitleEl.textContent = translations[lang][titleKey];
+            modalBodyEl.innerHTML = content;
+            modalOverlay.style.display = 'flex';
+        }
+
+        function showTab(tabId) {
+            tabContents.forEach(content => {
+                content.classList.add('hidden');
+            });
+            tabButtons.forEach(button => {
+                button.classList.remove('active', 'text-green-600', 'border-green-600');
+                button.classList.add('text-gray-600');
+            });
+            const activeTab = document.getElementById(`content-${tabId}`);
+            const activeTabButton = document.getElementById(`tab-${tabId}`);
+            if (activeTab) {
+                activeTab.classList.remove('hidden');
+            }
+            if (activeTabButton) {
+                activeTabButton.classList.add('active', 'text-green-600', 'border-green-600');
+            }
+
+            if (tabId === 'map') {
+                initializeMap();
+            } else if (tabId === 'dss') {
+                renderDSSDashboard('Sundarbans');
+            }
+        }
+
+        function initializeMap() {
+            if (mapInstance) {
+                mapInstance.invalidateSize();
+                return;
+            }
+
+            mapInstance = L.map('map').setView([20.5937, 78.9629], 5);
+            forestLayer = L.layerGroup().addTo(mapInstance);
+            claimsLayer = L.layerGroup().addTo(mapInstance);
+
+            const baseLayers = {
+                'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>' }),
+                'Dark': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>' }).addTo(mapInstance),
+                'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community', maxZoom: 18, }),
+                'Terrain': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri &mdash; Source: Esri, USGS, NOAA', maxZoom: 13, }),
+                'Geographical': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri &mdash; National Geographic, Esri, DeLorme, NAVTEQ, UNEP-WCMC, USGS, NASA, ESA, METI, NRCAN, GEBCO, and the GIS Community', maxZoom: 16, }),
+            };
+            L.control.layers(baseLayers).addTo(mapInstance);
+
+            const goBtn = document.getElementById('goBtn');
+            goBtn.addEventListener('click', updateMap);
+            updateMap();
+        }
+
+        function updateMap() {
+            if (!mapInstance || !forestLayer || !claimsLayer) return;
+            forestLayer.clearLayers();
+            claimsLayer.clearLayers();
+
+            const selectedForestKey = document.getElementById('forestSelect').value;
+            const forest = forests[selectedForestKey];
+            const lang = languageSelect.value;
+            if (!forest) return;
+
+            const polygonCoords = forest.coords[0].map(c => [c[0], c[1]]);
+            const forestPolygon = L.polygon(polygonCoords, {
+                color: '#27ae60',
+                fillColor: '#27ae60',
+                fillOpacity: 0.1,
+                weight: 2,
+            }).addTo(forestLayer);
+            mapInstance.fitBounds(forestPolygon.getBounds());
+
+            forest.claims.forEach(claim => {
+                const markerColor = claim.status === 'Approved' ? 'green' : 'orange';
+                const marker = L.circleMarker([claim.lat, claim.lon], {
+                    radius: 8,
+                    fillColor: markerColor,
+                    color: '#000',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8,
+                }).addTo(claimsLayer);
+
+                const popupContent = document.createElement('div');
+                const statusText = translations[lang][`${claim.status.toLowerCase()}-text`];
+                popupContent.innerHTML = `
+                    <div class="popup-title">${translations[lang]['popup-details-title']}</div>
+                    <p>${translations[lang]['popup-status']} <span class="claim-${claim.status.toLowerCase()}">${statusText}</span></p>
+                    <div class="popup-btn-group">
+                        ${claim.status === 'Pending' ? `<button class="details-btn">${translations[lang]['view-details-btn']}</button>` : ''}
+                        <button class="info-btn tribes-btn">${translations[lang]['tribes-btn']}</button>
+                        <button class="info-btn habitat-btn">${translations[lang]['habitat-btn']}</button>
+                    </div>
+                `;
+
+                const detailsBtn = popupContent.querySelector('.details-btn');
+                const tribesBtn = popupContent.querySelector('.tribes-btn');
+                const habitatBtn = popupContent.querySelector('.habitat-btn');
+
+                if (detailsBtn) {
+                    detailsBtn.addEventListener('click', () => {
+                        showModal('modal-title-pending', `<strong>${translations[lang]['reason-label']}</strong> ${claim.reason}`);
+                    });
+                }
+                if (tribesBtn) {
+                    tribesBtn.addEventListener('click', () => {
+                        showModal('modal-title-tribes', `<p>${forest.tribalInfo}</p>`);
+                    });
+                }
+                if (habitatBtn) {
+                    habitatBtn.addEventListener('click', () => {
+                        showModal('modal-title-habitat', `<p>${forest.habitatInfo}</p>`);
+                    });
+                }
+                marker.bindPopup(popupContent);
+            });
+        }
+
+        // Records Digitization Tab Logic
+        //--------------------------------------------------------------------------------
+        const processButton = document.getElementById('process-button');
+        const processButtonText = document.getElementById('process-button-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const fileInput = document.getElementById('file-upload');
+        const extractedContainer = document.getElementById('extracted-data-container');
+        const villageField = document.getElementById('village-field');
+        const holderField = document.getElementById('holder-field');
+        const coordsField = document.getElementById('coords-field');
+        processButton.addEventListener('click', () => {
+            if (fileInput.files.length > 0) {
+                processButtonText.classList.add('hidden');
+                loadingSpinner.classList.remove('hidden');
+                processButton.disabled = true;
+                setTimeout(() => {
+                    villageField.textContent = mockExtractedData.village;
+                    holderField.textContent = mockExtractedData.holder;
+                    coordsField.textContent = mockExtractedData.coords;
+                    extractedContainer.classList.remove('hidden');
+                    const currentLang = languageSelect.value;
+                    processButtonText.textContent = translations[currentLang]['process-button'];
+                    processButtonText.classList.remove('hidden');
+                    loadingSpinner.classList.add('hidden');
+                    processButton.disabled = false;
+                }, 2000);
+            } else {
+                showModal('error-title', translations[languageSelect.value]['error-upload']);
+            }
+        });
+
+        // DSS Dashboard Tab Logic
+        //--------------------------------------------------------------------------------
+        const renderDSSDashboard = (forestName) => {
+            const data = dssForestData[forestName];
+            if (!data) return;
+
+            currentForestName = forestName;
+
+            // Update key metrics
+            document.getElementById('treeDensity').innerText = data.treeDensity;
+            document.getElementById('biodiversityIndex').innerText = data.biodiversityIndex;
+            document.getElementById('waterLevel').innerText = data.waterLevel;
+            document.getElementById('ecosystemValue').innerText = data.ecosystemValue;
+
+            const threatLevelEl = document.getElementById('threatLevel');
+            threatLevelEl.innerHTML = `${data.threatLevel} <span class="ml-1">${getThreatIcon(data.threatLevel)}</span>`;
+            threatLevelEl.className = 'text-2xl font-bold';
+
+            // Dynamically set threat level color
+            if (data.threatLevel.includes('Very Low')) {
+                threatLevelEl.classList.add('text-green-600');
+            } else if (data.threatLevel.includes('Low')) {
+                threatLevelEl.classList.add('text-green-400');
+            } else if (data.threatLevel.includes('Medium')) {
+                threatLevelEl.classList.add('text-yellow-600');
+            } else {
+                threatLevelEl.classList.add('text-red-600');
+            }
+
+            // Update chart data
+            deforestationChart.data.datasets[0].data = data.deforestation;
+            afforestationChart.data.datasets[0].data = data.afforestation;
+
+            // Call the prediction function to update the predicted lines
+            updatePrediction();
+        };
+
+        const getThreatIcon = (threatLevel) => {
+            if (threatLevel.includes('Very Low')) {
+                return '🌳';
+            } else if (threatLevel.includes('Low')) {
+                return '🌿';
+            } else if (threatLevel.includes('Medium')) {
+                return '⚠️';
+            } else {
+                return '🔥';
+            }
+        };
+
+        const initializeCharts = () => {
+            const labels = Array.from({ length: 10 }, (_, i) => 2018 + i);
+
+            const ctxDeforestation = document.getElementById('deforestationChart').getContext('2d');
+            deforestationChart = new Chart(ctxDeforestation, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Actual Deforested Area (ha)',
+                        data: [],
+                        borderColor: 'red',
+                        fill: false
+                    },
+                    {
+                        label: 'Predicted Deforested Area (ha)',
+                        data: [],
+                        borderColor: 'red',
+                        borderDash: [5, 5],
+                        fill: false
+                    }]
+                }
+            });
+
+            const ctxAfforestation = document.getElementById('afforestationChart').getContext('2d');
+            afforestationChart = new Chart(ctxAfforestation, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Actual Afforested Area (ha)',
+                        data: [],
+                        backgroundColor: '#10B981'
+                    },
+                    {
+                        label: 'Predicted Afforested Area (ha)',
+                        data: [],
+                        backgroundColor: 'rgba(59, 130, 246, 0.5)'
+                    }]
+                }
+            });
+        };
+
+        const renderForestCards = () => {
+            const metricsSection = document.getElementById('metricsSection');
+            metricsSection.innerHTML = '';
+
+            Object.keys(dssForestData).forEach(forestName => {
+                const data = dssForestData[forestName];
+                const cardHtml = `
+                    <div class="bg-white p-4 rounded-xl shadow cursor-pointer hover:shadow-lg transition-shadow duration-200" data-forest="${forestName}">
+                        <h2 class="font-bold text-gray-800">${forestName} Forest Area</h2>
+                        <p class="text-2xl text-green-600">${data.area}</p>
+                    </div>
+                `;
+                metricsSection.insertAdjacentHTML('beforeend', cardHtml);
+            });
+
+            metricsSection.querySelectorAll('[data-forest]').forEach(card => {
+                card.addEventListener('click', () => {
+                    renderDSSDashboard(card.getAttribute('data-forest'));
+                });
+            });
+        };
+
+        const afforestationInput = document.getElementById('afforestationInput');
+        const patrolInput = document.getElementById('patrolInput');
+        const predictionValue = document.getElementById('predictionValue');
+
+        const updatePrediction = () => {
+            const afforestationImpact = parseFloat(afforestationInput.value) * 0.05;
+            const patrolImpact = parseFloat(patrolInput.value) * 0.08;
+            const totalImpact = (afforestationImpact + patrolImpact) - 1.5;
+            predictionValue.innerText = `${totalImpact > 0 ? '+' : ''}${totalImpact.toFixed(1)}%`;
+
+            const currentData = dssForestData[currentForestName];
+            if (!currentData) return;
+
+            const predictedDeforestation = [...currentData.deforestation];
+            const predictedAfforestation = [...currentData.afforestation];
+
+            const afforestationChange = afforestationInput.value / 100;
+            const patrolChange = patrolInput.value / 100;
+
+            for (let i = 0; i < currentData.deforestation.length; i++) {
+                predictedDeforestation[i] = Math.max(0, currentData.deforestation[i] * (1 - (patrolChange * 0.5)));
+                predictedAfforestation[i] = currentData.afforestation[i] * (1 + (afforestationChange * 0.5));
+            }
+
+            deforestationChart.data.datasets[1].data = predictedDeforestation;
+            afforestationChart.data.datasets[1].data = predictedAfforestation;
+
+            deforestationChart.update();
+            afforestationChart.update();
+        };
+
+        afforestationInput.addEventListener('input', updatePrediction);
+        patrolInput.addEventListener('input', updatePrediction);
+
+        const filterButtons = document.querySelectorAll('.forest-filter-btn');
+
+        filterButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const filter = e.target.dataset.filter;
+
+                document.querySelectorAll('#metricsSection [data-forest]').forEach(item => {
+                    if (filter === 'all' || item.getAttribute('data-forest') === filter) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+
+                filterButtons.forEach(btn => {
+                    btn.classList.remove('active', 'bg-green-700', 'text-white');
+                    btn.classList.add('bg-gray-200', 'text-gray-800');
+                });
+                e.target.classList.remove('bg-gray-200', 'text-gray-800');
+                e.target.classList.add('active', 'bg-green-700', 'text-white');
+            });
+        });
+
+        // Community & Feedback Tab Logic
+        //--------------------------------------------------------------------------------
+        const communityForm = document.getElementById('community-form');
+        communityForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pattaId = document.getElementById('patta-holder-id').value;
+            const verification = document.getElementById('boundary-verification').value;
+            const feedback = document.getElementById('feedback-update').value;
+
+            if (pattaId && (verification || feedback)) {
+                // Here is where you would integrate with Firebase Firestore to save the feedback
+                // await addDoc(collection(db, `artifacts/${appId}/public/data/community_feedback`), {
+                //     pattaId: pattaId,
+                //     verification: verification,
+                //     feedback: feedback,
+                //     timestamp: new Date()
+                // });
+                console.log('Community Feedback Submitted:', { pattaId, verification, feedback });
+                document.getElementById('community-success-message').classList.remove('hidden');
+                communityForm.reset();
+                setTimeout(() => {
+                    document.getElementById('community-success-message').classList.add('hidden');
+                }, 5000);
+            } else {
+                showModal('error-title', 'Please fill in the Patta Holder ID and at least one feedback field.');
+            }
+        });
+
+        // Global event listeners
+        //--------------------------------------------------------------------------------
+        closeModalBtn.addEventListener('click', () => {
+            modalOverlay.style.display = 'none';
+        });
+
+        languageSelect.addEventListener('change', () => {
+            translatePage();
+            if (mapInstance) {
+                updateMap();
+            }
+        });
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const tabId = button.id.replace('tab-', '');
+                showTab(tabId);
+            });
+        });
+
+        // Initial setup
+        //--------------------------------------------------------------------------------
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize DSS charts and cards first, so data is ready when the tab is switched to
+            initializeCharts();
+            renderForestCards();
+            // Show the default tab, which is now the DSS tab
+            showTab('dss');
+            translatePage(); // Initial translation based on default language
+        });
+    </script>
+</body>
+
+</html>

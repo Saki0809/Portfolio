@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <title>Vibrant Dino Runner with Clouds & Day-Night Cycle</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Baloo+2&display=swap');
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Baloo 2', cursive;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #game {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation;
+            background: #87ceeb;
+        }
+
+        canvas {
+            display: block;
+            background: transparent;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #222;
+            font-size: 18px;
+            font-weight: 700;
+            text-shadow: 1px 1px 2px #fff;
+            user-select: none;
+            z-index: 10;
+            text-align: right;
+        }
+
+        #seasonDisplay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #222;
+            text-shadow: 1px 1px 2px #fff;
+            user-select: none;
+            z-index: 10;
+        }
+
+        #startOverlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #444;
+            font-size: 28px;
+            font-weight: 800;
+            text-align: center;
+            user-select: none;
+            cursor: pointer;
+            z-index: 15;
+            white-space: pre-line;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div>Score: <span id="score">0</span></div>
+            <div>High Score: <span id="highScore">0</span></div>
+            <div>Total Score: <span id="totalScore">0</span></div>
+        </div>
+        <div id="seasonDisplay">Season: Spring</div>
+        <div id="startOverlay" tabindex="0">
+            Tap / Press Space to Start
+            <br />
+            <span>Jump = Tap or Spacebar | Duck = Swipe Down or Arrow Down</span>
+        </div>
+    </div>
+
+    <script>
+        (() => {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreEl = document.getElementById('score');
+            const highScoreEl = document.getElementById('highScore');
+            const totalScoreEl = document.getElementById('totalScore');
+            const startOverlay = document.getElementById('startOverlay');
+            const seasonDisplay = document.getElementById('seasonDisplay');
+            const gameDiv = document.getElementById('game');
+
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resize();
+            window.addEventListener('resize', resize);
+
+            const groundY = canvas.height * 0.8;
+            const gravity = 0.7;
+            const dinoWidth = 60;
+            const dinoHeight = 60;
+            const obstacleWidth = 30;
+            const obstacleHeight = 50;
+
+            const seasons = ['Spring', 'Summer', 'Autumn', 'Winter'];
+            let currentSeasonIndex = 0;
+            function cycleSeason() {
+                currentSeasonIndex = (currentSeasonIndex + 1) % seasons.length;
+                seasonDisplay.textContent = 'Season: ' + seasons[currentSeasonIndex];
+            }
+            seasonDisplay.textContent = 'Season: ' + seasons[currentSeasonIndex];
+
+            // Polyfill for roundRect if missing
+            if (!CanvasRenderingContext2D.prototype.roundRect) {
+                CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+                    if (w < 2 * r) r = w / 2;
+                    if (h < 2 * r) r = h / 2;
+                    this.beginPath();
+                    this.moveTo(x + r, y);
+                    this.arcTo(x + w, y, x + w, y + h, r);
+                    this.arcTo(x + w, y + h, x, y + h, r);
+                    this.arcTo(x, y + h, x, y, r);
+                    this.arcTo(x, y, x + w, y, r);
+                    this.closePath();
+                    return this;
+                }
+            }
+
+            // Dino object
+            const dino = {
+                x: 50,
+                y: groundY - dinoHeight,
+                width: dinoWidth,
+                height: dinoHeight,
+                vy: 0,
+                jumping: false,
+                ducking: false,
+                draw() {
+                    ctx.save();
+                    ctx.fillStyle = '#4a90e2';
+                    ctx.strokeStyle = '#2c5aa0';
+                    ctx.lineWidth = 3;
+                    ctx.lineJoin = 'round';
+
+                    ctx.beginPath();
+                    if (this.ducking) {
+                        ctx.roundRect(this.x, this.y + 25, this.width, this.height - 25, 15);
+                        ctx.fill();
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.ellipse(this.x + this.width * 0.75, this.y + 35, 15, 15, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+
+                        ctx.fillStyle = 'white';
+                        ctx.beginPath();
+                        ctx.ellipse(this.x + this.width * 0.8, this.y + 30, 6, 6, 0, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.fillStyle = 'black';
+                        ctx.beginPath();
+                        ctx.ellipse(this.x + this.width * 0.8, this.y + 30, 3, 3, 0, 0, Math.PI * 2);
+                        ctx.fill();
+
+                    } else {
+                        ctx.roundRect(this.x, this.y, this.width, this.height, 20);
+                        ctx.fill();
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.ellipse(this.x + this.width * 0.75, this.y + 20, 20, 20, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+
+                        ctx.fillStyle = 'white';
+                        ctx.beginPath();
+                        ctx.ellipse(this.x + this.width * 0.8, this.y + 15, 8, 8, 0, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.fillStyle = 'black';
+                        ctx.beginPath();
+                        ctx.ellipse(this.x + this.width * 0.8, this.y + 15, 4, 4, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                },
+                update() {
+                    if (this.jumping) {
+                        this.vy += gravity;
+                        this.y += this.vy;
+                        if (this.y >= groundY - this.height) {
+                            this.y = groundY - this.height;
+                            this.jumping = false;
+                            this.vy = 0;
+                        }
+                    }
+                },
+                jump() {
+                    if (!this.jumping) {
+                        this.jumping = true;
+                        this.vy = -14;
+                        this.ducking = false;
+                    }
+                },
+                duck(state) {
+                    if (!this.jumping) {
+                        this.ducking = state;
+                    }
+                }
+            };
+
+            class Obstacle {
+                constructor(x, type) {
+                    this.x = x;
+                    this.width = obstacleWidth;
+                    this.height = obstacleHeight;
+                    this.type = type;
+                    this.y = groundY - this.height;
+                    if (this.type === 'bird') {
+                        this.y -= 40;
+                        this.height = 30;
+                        this.width = 40;
+                    }
+                    this.wingFlapPhase = Math.random() * Math.PI * 2;
+                }
+                draw() {
+                    ctx.save();
+                    if (this.type === 'cactus') {
+                        ctx.fillStyle = '#228B22';
+                        ctx.strokeStyle = '#1a4e1a';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x, this.y + this.height);
+                        ctx.lineTo(this.x + this.width * 0.2, this.y + this.height * 0.3);
+                        ctx.lineTo(this.x + this.width * 0.5, this.y + this.height * 0.1);
+                        ctx.lineTo(this.x + this.width * 0.7, this.y + this.height * 0.3);
+                        ctx.lineTo(this.x + this.width, this.y + this.height);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+                    } else if (this.type === 'bird') {
+                        ctx.fillStyle = '#444';
+                        ctx.strokeStyle = '#222';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.ellipse(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, this.height / 2, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+
+                        let wingFlap = Math.sin(Date.now() / 200 + this.wingFlapPhase) * 10;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + this.width / 2, this.y + this.height / 2);
+                        ctx.lineTo(this.x + this.width / 2 - 20, this.y + this.height / 2 - wingFlap);
+                        ctx.lineTo(this.x + this.width / 2 - 10, this.y + this.height / 2);
+                        ctx.fill();
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+                update(speed) {
+                    this.x -= speed;
+                }
+            }
+            let obstacles = [];
+
+            class Cloud {
+                constructor() {
+                    this.reset();
+                }
+                reset() {
+                    this.x = Math.random() * canvas.width;
+                    this.y = Math.random() * groundY * 0.5;
+                    this.speed = 0.3 + Math.random() * 0.4;
+                    this.size = 30 + Math.random() * 40;
+                    this.phase = Math.random() * Math.PI * 2;
+                }
+                draw() {
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                    ctx.beginPath();
+                    let baseX = this.x;
+                    let baseY = this.y;
+
+                    for (let i = 0; i < 5; i++) {
+                        ctx.ellipse(baseX + i * this.size * 0.3, baseY, this.size * 0.4, this.size * 0.3, 0, 0, Math.PI * 2);
+                    }
+                    ctx.fill();
+                    ctx.restore();
+                }
+                update() {
+                    this.x += this.speed;
+                    this.y += Math.sin(Date.now() / 1000 + this.phase) * 0.3;
+                    if (this.x - this.size > canvas.width) this.x = -this.size;
+                }
+            }
+
+            let clouds = [];
+            for (let i = 0; i < 10; i++) {
+                clouds.push(new Cloud());
+            }
+
+            // Day-night cycle colors
+            function getDayNightColor(time) {
+                const seconds = (time / 1000) % 60;
+                // From 0 to 30 seconds, day to night, 30 to 60 night to day
+                const t = seconds < 30 ? seconds / 30 : (60 - seconds) / 30;
+                const dayColor = [135, 206, 235];  // skyblue
+                const nightColor = [18, 18, 64];   // dark navy
+
+                const r = dayColor[0] * t + nightColor[0] * (1 - t);
+                const g = dayColor[1] * t + nightColor[1] * (1 - t);
+                const b = dayColor[2] * t + nightColor[2] * (1 - t);
+
+                return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+            }
+
+            let speed = 5;
+            const maxSpeed = 15;
+            let obstacleTimer = 0;
+            let obstacleInterval = 90;
+
+            let score = 0;
+            let highScore = parseInt(localStorage.getItem('dinoHighScore')) || 0;
+            let totalScore = parseInt(localStorage.getItem('dinoTotalScore')) || 0;
+
+            let gameStarted = false;
+            let gameOver = false;
+            let dayNightStart = null;
+
+            function updateScores() {
+                scoreEl.textContent = score;
+                highScoreEl.textContent = highScore;
+                totalScoreEl.textContent = totalScore;
+            }
+
+            function resetGame() {
+                score = 0;
+                speed = 5;
+                obstacleTimer = 0;
+                obstacles = [];
+                dino.x = 50;
+                dino.y = groundY - dinoHeight;
+                dino.vy = 0;
+                dino.jumping = false;
+                dino.ducking = false;
+                gameOver = false;
+                updateScores();
+            }
+
+            function startGame() {
+                if (gameStarted) return;
+                gameStarted = true;
+                startOverlay.style.display = 'none';
+                dayNightStart = performance.now();
+                resetGame();
+                requestAnimationFrame(loop);
+            }
+
+            function gameOverHandler() {
+                gameOver = true;
+                totalScore += score;
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('dinoHighScore', highScore);
+                }
+                localStorage.setItem('dinoTotalScore', totalScore);
+                updateScores();
+                startOverlay.textContent = 'Game Over\nTap / Press Space to Restart';
+                startOverlay.style.display = 'block';
+                gameStarted = false;
+            }
+
+            // Input handlers
+            function onKeyDown(e) {
+                if (e.code === 'Space' || e.code === 'ArrowUp') {
+                    e.preventDefault();
+                    if (!gameStarted) {
+                        startGame();
+                    } else if (!gameOver) {
+                        dino.jump();
+                    }
+                } else if (e.code === 'ArrowDown') {
+                    e.preventDefault();
+                    if (gameStarted && !gameOver) {
+                        dino.duck(true);
+                    }
+                }
+            }
+            function onKeyUp(e) {
+                if (e.code === 'ArrowDown') {
+                    dino.duck(false);
+                }
+            }
+
+            // Mobile input - tap and swipe down
+            let touchStartY = null;
+            let touchStartX = null;
+            gameDiv.addEventListener('touchstart', e => {
+                if (e.touches.length === 1) {
+                    touchStartY = e.touches[0].clientY;
+                    touchStartX = e.touches[0].clientX;
+                }
+            }, { passive: true });
+
+            gameDiv.addEventListener('touchend', e => {
+                if (!touchStartY) return;
+                let touchEndY = e.changedTouches[0].clientY;
+                let touchEndX = e.changedTouches[0].clientX;
+                let diffY = touchEndY - touchStartY;
+                let diffX = touchEndX - touchStartX;
+
+                if (!gameStarted) {
+                    startGame();
+                } else if (!gameOver) {
+                    if (diffY > 40 && Math.abs(diffX) < 50) {
+                        // swipe down
+                        dino.duck(true);
+                        setTimeout(() => dino.duck(false), 500);
+                    } else if (diffY < 10 && Math.abs(diffX) < 50) {
+                        // tap/jump
+                        dino.jump();
+                    }
+                }
+
+                touchStartY = null;
+                touchStartX = null;
+            }, { passive: true });
+
+            // Main loop
+            function loop(timestamp) {
+                if (!dayNightStart) dayNightStart = timestamp;
+                const elapsed = timestamp - dayNightStart;
+
+                // Background
+                ctx.fillStyle = getDayNightColor(elapsed);
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw clouds
+                clouds.forEach(c => {
+                    c.update();
+                    c.draw();
+                });
+
+                // Draw ground
+                ctx.fillStyle = '#654321';
+                ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+
+                // Speed increase: speed grows slowly until maxSpeed
+                speed += 0.002;
+                if (speed > maxSpeed) speed = maxSpeed;
+
+                // Generate obstacles
+                obstacleTimer++;
+                if (obstacleTimer > obstacleInterval) {
+                    obstacleTimer = 0;
+                    // Randomly pick cactus or bird
+                    let type = Math.random() < 0.7 ? 'cactus' : 'bird';
+                    let newX = canvas.width + Math.random() * 200;
+                    obstacles.push(new Obstacle(newX, type));
+                    // Vary interval a bit
+                    obstacleInterval = 80 + Math.floor(Math.random() * 60);
+                }
+
+                // Update & draw obstacles
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    let o = obstacles[i];
+                    o.update(speed);
+                    o.draw();
+
+                    // Remove obstacles that passed out of screen
+                    if (o.x + o.width < 0) {
+                        obstacles.splice(i, 1);
+                    }
+
+                    // Collision detection
+                    if (collides(dino, o)) {
+                        gameOverHandler();
+                    }
+                }
+
+                // Update & draw dino
+                dino.update();
+                dino.draw();
+
+                // Score increments gradually by speed * factor
+                if (!gameOver && gameStarted) {
+                    score += Math.floor(speed * 0.3);
+                    if (score > highScore) highScore = score;
+                    updateScores();
+                }
+
+                // Cycle season every 15 seconds
+                if (Math.floor(elapsed / 15000) !== currentSeasonIndex) {
+                    currentSeasonIndex = Math.floor(elapsed / 15000) % seasons.length;
+                    seasonDisplay.textContent = 'Season: ' + seasons[currentSeasonIndex];
+                }
+
+                if (!gameOver) {
+                    requestAnimationFrame(loop);
+                }
+            }
+
+            function collides(rect1, rect2) {
+                // Hitbox correction for ducking dino
+                let dinoRect = {
+                    x: rect1.x,
+                    y: rect1.y + (rect1.ducking ? 25 : 0),
+                    width: rect1.width,
+                    height: rect1.height - (rect1.ducking ? 25 : 0)
+                };
+                return dinoRect.x < rect2.x + rect2.width &&
+                    dinoRect.x + dinoRect.width > rect2.x &&
+                    dinoRect.y < rect2.y + rect2.height &&
+                    dinoRect.height + dinoRect.y > rect2.y;
+            }
+
+            // Listeners
+            window.addEventListener('keydown', onKeyDown);
+            window.addEventListener('keyup', onKeyUp);
+
+            startOverlay.addEventListener('click', () => {
+                startGame();
+            });
+            startOverlay.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    startGame();
+                }
+            });
+
+            // Initial draw
+            ctx.fillStyle = getDayNightColor(0);
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            clouds.forEach(c => c.draw());
+            dino.draw();
+
+        })();
+    </script>
+</body>
+
+</html>
