@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import AntigravityBackground from './components/effects/AntigravityBackground';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
@@ -11,7 +11,7 @@ import Contact from './components/sections/Contact';
 import Admin from './pages/Admin';
 
 const HomePage = () => (
-  <div className="relative min-h-screen">
+  <div className="relative min-h-screen bg-[#0a0a0f]">
     {/* Antigravity floating background */}
     <AntigravityBackground />
     
